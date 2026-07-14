@@ -1,0 +1,7 @@
+FROM eclipse-temurin:21-jdk-alpine
+WORKDIR /app
+COPY . .
+# Cấp quyền thực thi cho gradlew
+RUN chmod +x gradlew
+# Chạy Spring Boot ở chế độ phát triển
+CMD ["./gradlew", "bootRun"]

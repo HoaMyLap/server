@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: dev
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/smart_task_db
+    username: admin
+    password: supersecretpassword
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  jwt:
+    secret: springboot_jwt_secret_dev_key_must_change_in_prod_long_key_32_bytes
+    expiration-ms: 86400000 # 24 hours
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY:your_gemini_api_key_here}

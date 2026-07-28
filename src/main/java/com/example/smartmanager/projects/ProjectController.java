@@ -44,6 +44,20 @@ public class ProjectController {
         }
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'MEMBER')")
+    public ResponseEntity<?> updateProject(
+            @PathVariable("id") String projectId,
+            @Valid @RequestBody ProjectEntity project) {
+        try {
+            project.setId(java.util.UUID.fromString(projectId));
+            ProjectEntity updated = projectService.updateProject(project);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'ADMIN')")
     public ResponseEntity<?> deleteProject(@PathVariable("id") String projectId) {

@@ -53,4 +53,22 @@ public class WorkspaceService {
     public List<WorkspaceMemberDto> getWorkspaceMembers(String workspaceId) {
         return workspaceMemberRepository.findMembersWithDetails(UUID.fromString(workspaceId));
     }
+
+    @Transactional
+    public void removeMember(String workspaceId, String userId) {
+        WorkspaceMemberId memberId = new WorkspaceMemberId(UUID.fromString(workspaceId), UUID.fromString(userId));
+        if (!workspaceMemberRepository.existsById(memberId)) {
+            throw new IllegalArgumentException("Thành viên không tồn tại trong không gian làm việc này");
+        }
+        workspaceMemberRepository.deleteById(memberId);
+    }
+
+    @Transactional
+    public void updateMemberRole(String workspaceId, String userId, String newRole) {
+        WorkspaceMemberId memberId = new WorkspaceMemberId(UUID.fromString(workspaceId), UUID.fromString(userId));
+        WorkspaceMemberEntity member = workspaceMemberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("Thành viên không tồn tại trong không gian làm việc này"));
+        member.setRole(newRole);
+        workspaceMemberRepository.save(member);
+    }
 }

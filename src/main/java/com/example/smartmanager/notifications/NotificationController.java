@@ -32,4 +32,14 @@ public class NotificationController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PatchMapping("/read-all")
+    public ResponseEntity<?> markAllAsRead(@AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            notificationService.markAllAsRead(userPrincipal.getId());
+            return ResponseEntity.ok(Map.of("message", "Đã đánh dấu tất cả là đã đọc"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

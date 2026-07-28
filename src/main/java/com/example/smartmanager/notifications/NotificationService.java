@@ -28,6 +28,17 @@ public class NotificationService {
     }
 
     @Transactional
+    public void markAllAsRead(String userId) {
+        List<NotificationEntity> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId));
+        for (NotificationEntity n : list) {
+            if (!Boolean.TRUE.equals(n.getIsRead())) {
+                n.setIsRead(true);
+                notificationRepository.save(n);
+            }
+        }
+    }
+
+    @Transactional
     public NotificationEntity createNotification(String userId, String title, String content, String type) {
         NotificationEntity notification = new NotificationEntity(
                 null,

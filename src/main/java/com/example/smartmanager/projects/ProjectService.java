@@ -30,6 +30,18 @@ public class ProjectService {
     }
 
     @Transactional
+    public ProjectEntity updateProject(ProjectEntity projectDetails) {
+        ProjectEntity project = getProjectById(projectDetails.getId().toString());
+        project.setName(projectDetails.getName());
+        project.setDescription(projectDetails.getDescription());
+        if (projectDetails.getStatus() != null) {
+            project.setStatus(projectDetails.getStatus());
+        }
+        project.setUpdatedAt(LocalDateTime.now());
+        return projectRepository.save(project);
+    }
+
+    @Transactional
     public void deleteProject(String projectId) {
         ProjectEntity project = getProjectById(projectId);
         projectRepository.delete(project);

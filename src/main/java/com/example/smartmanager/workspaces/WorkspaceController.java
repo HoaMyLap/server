@@ -56,4 +56,35 @@ public class WorkspaceController {
         List<WorkspaceMemberDto> members = workspaceService.getWorkspaceMembers(workspaceId);
         return ResponseEntity.ok(members);
     }
+
+    @DeleteMapping("/{id}/members/{userId}")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'ADMIN')")
+    public ResponseEntity<?> removeMember(
+            @PathVariable("id") String workspaceId,
+            @PathVariable("userId") String userId) {
+        try {
+            workspaceService.removeMember(workspaceId, userId);
+            return ResponseEntity.ok(Map.of("message", "Xóa thành viên thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/{id}/members/{userId}/role")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'ADMIN')")
+    public ResponseEntity<?> updateMemberRole(
+            @PathVariable("id") String workspaceId,
+            @PathVariable("userId") String userId,
+            @RequestBody Map<String, String> body) {
+        try {
+            String role = body.get("role");
+            if (role == null || role.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Role không được để trống"));
+            }
+            workspaceService.updateMemberRole(workspaceId, userId, role);
+            return ResponseEntity.ok(Map.of("message", "Cập nhật vai trò thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

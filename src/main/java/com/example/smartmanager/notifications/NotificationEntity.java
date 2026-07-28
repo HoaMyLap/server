@@ -31,7 +31,10 @@ public class NotificationEntity {
     private Boolean isRead = false;
 
     @Column(nullable = false)
-    private String type; // ASSIGNMENT, COMMENT, WORKSPACE
+    private String type; // ASSIGNMENT, COMMENT, WORKSPACE, INVITATION, LEAVE_REQUEST
+
+    @Column(name = "invitation_id")
+    private UUID invitationId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

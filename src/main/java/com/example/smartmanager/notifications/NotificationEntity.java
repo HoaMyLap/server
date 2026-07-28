@@ -36,6 +36,9 @@ public class NotificationEntity {
     @Column(name = "invitation_id")
     private UUID invitationId;
 
+    @Transient
+    private String invitationStatus;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

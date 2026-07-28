@@ -37,7 +37,14 @@ public class NotificationService {
     private final SimpMessagingTemplate messagingTemplate;
 
     public List<NotificationEntity> getUserNotifications(String userId) {
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId));
+        List<NotificationEntity> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId));
+        for (NotificationEntity n : list) {
+            if (n.getInvitationId() != null) {
+                invitationRepository.findById(n.getInvitationId())
+                        .ifPresent(inv -> n.setInvitationStatus(inv.getStatus()));
+            }
+        }
+        return list;
     }
 
     @Transactional
@@ -66,16 +73,15 @@ public class NotificationService {
 
     @Transactional
     public NotificationEntity createNotificationWithInvitation(String userId, String title, String content, String type, UUID invitationId) {
-        NotificationEntity notification = new NotificationEntity(
-                null,
-                UUID.fromString(userId),
-                title,
-                content,
-                false,
-                type,
-                invitationId,
-                LocalDateTime.now()
-        );
+        NotificationEntity notification = new NotificationEntity();
+        notification.setUserId(UUID.fromString(userId));
+        notification.setTitle(title);
+        notification.setContent(content);
+        notification.setIsRead(false);
+        notification.setType(type);
+        notification.setInvitationId(invitationId);
+        notification.setCreatedAt(LocalDateTime.now());
+
         NotificationEntity saved = notificationRepository.save(notification);
 
         // Phát tin nhắn realtime qua WebSocket cho riêng user

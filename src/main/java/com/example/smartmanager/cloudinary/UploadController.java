@@ -23,4 +23,19 @@ public class UploadController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PostMapping("/file")
+    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
+        try {
+            String fileUrl = cloudinaryService.uploadFile(file);
+            return ResponseEntity.ok(Map.of(
+                "url", fileUrl,
+                "name", file.getOriginalFilename() != null ? file.getOriginalFilename() : "document",
+                "size", file.getSize(),
+                "type", file.getContentType() != null ? file.getContentType() : "application/octet-stream"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

@@ -377,4 +377,25 @@ public class NotificationService {
         notification.setIsRead(true);
         return notificationRepository.save(notification);
     }
+
+    @Transactional
+    public void inviteUsersBatch(BatchInviteUserRequest req, String inviterId) {
+        if (req.getEmails() == null || req.getEmails().isEmpty()) {
+            throw new IllegalArgumentException("Danh sách email không được để trống");
+        }
+        for (String email : req.getEmails()) {
+            if (email != null && !email.isBlank()) {
+                InviteUserRequest singleReq = new InviteUserRequest();
+                singleReq.setTargetType(req.getTargetType());
+                singleReq.setTargetId(req.getTargetId());
+                singleReq.setRole(req.getRole());
+                singleReq.setEmail(email.trim());
+                try {
+                    inviteUser(singleReq, inviterId);
+                } catch (Exception e) {
+                    // Tiếp tục xử lý các email còn lại nếu 1 email đã có trong hệ thống hoặc bị trùng
+                }
+            }
+        }
+    }
 }

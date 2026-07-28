@@ -30,6 +30,19 @@ public class TaskController {
         }
     }
 
+    @PostMapping("/batch")
+    @PreAuthorize("@securityService.hasProjectRole(#request.projectId, 'MEMBER')")
+    public ResponseEntity<?> createBatchTasks(
+            @RequestBody BatchCreateTasksRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            List<TaskEntity> created = taskService.createBatchTasks(request, userPrincipal.getId());
+            return ResponseEntity.ok(created);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/project/{projectId}")
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
     public ResponseEntity<List<TaskEntity>> getProjectTasks(@PathVariable("projectId") String projectId) {

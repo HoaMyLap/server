@@ -39,4 +39,27 @@ public class CloudinaryService {
             throw new RuntimeException("Tải ảnh lên Cloudinary thất bại: " + e.getMessage());
         }
     }
+
+    /**
+     * Tải tệp tin/tài liệu bất kỳ (PDF, Word, Excel, Zip, Image) lên Cloudinary
+     */
+    public String uploadFile(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File tải lên không được để trống");
+        }
+
+        try {
+            Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
+                    "folder", "homix/documents",
+                    "resource_type", "auto"
+            ));
+
+            String url = (String) uploadResult.get("secure_url");
+            log.info("Tải file lên Cloudinary thành công! URL: {}", url);
+            return url;
+        } catch (IOException e) {
+            log.error("Lỗi tải file lên Cloudinary: {}", e.getMessage());
+            throw new RuntimeException("Tải file lên Cloudinary thất bại: " + e.getMessage());
+        }
+    }
 }

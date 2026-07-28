@@ -58,6 +58,19 @@ public class NotificationController {
         }
     }
 
+    @PostMapping("/invite-batch")
+    @PreAuthorize("('WORKSPACE'.equals(#req.targetType) and @securityService.hasWorkspaceRole(#req.targetId, 'ADMIN')) or ('PROJECT'.equals(#req.targetType) and @securityService.hasProjectRole(#req.targetId, 'ADMIN'))")
+    public ResponseEntity<?> inviteUsersBatch(
+            @Valid @RequestBody BatchInviteUserRequest req,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            notificationService.inviteUsersBatch(req, userPrincipal.getId());
+            return ResponseEntity.ok(Map.of("message", "Gửi lời mời hàng loạt thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{id}/respond-invitation")
     public ResponseEntity<?> respondInvitation(
             @PathVariable("id") String notificationId,

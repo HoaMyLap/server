@@ -346,4 +346,28 @@ public class TaskService {
         List<String> titles = suggestAiSubtasks(taskId);
         return addBatchSubtasks(taskId, titles, userId);
     }
+
+    @Transactional
+    public List<TaskEntity> createBatchTasks(BatchCreateTasksRequest request, String userId) {
+        if (request.getTasks() == null || request.getTasks().isEmpty()) {
+            throw new IllegalArgumentException("Danh sách công việc không được để trống");
+        }
+        UUID projectUuid = UUID.fromString(request.getProjectId());
+        List<TaskEntity> createdList = new java.util.ArrayList<>();
+
+        for (TaskEntity task : request.getTasks()) {
+            if (task.getTitle() != null && !task.getTitle().isBlank()) {
+                task.setProjectId(projectUuid);
+                if (task.getStatus() == null || task.getStatus().isBlank()) {
+                    task.setStatus("TODO");
+                }
+                if (task.getPriority() == null || task.getPriority().isBlank()) {
+                    task.setPriority("MEDIUM");
+                }
+                TaskEntity created = createTask(task, userId);
+                createdList.add(created);
+            }
+        }
+        return createdList;
+    }
 }

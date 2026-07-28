@@ -2,8 +2,8 @@ package com.example.smartmanager.email;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class EmailWorker {
 
@@ -22,6 +21,10 @@ public class EmailWorker {
     
     private ExecutorService executorService;
     private volatile boolean running = true;
+
+    public EmailWorker(@Qualifier("redisTemplate") RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     @PostConstruct
     public void startWorker() {
@@ -49,7 +52,6 @@ public class EmailWorker {
         log.info("📧 [Email Background Job] Đang thực thi gửi mail mời tới: {} | Workspace: {} | Role: {}",
                 job.getRecipientEmail(), job.getWorkspaceName(), job.getRole());
         
-        // Giả lập tiến trình gửi mail bất đồng bộ (2 giây)
         try {
             Thread.sleep(1000);
             log.info("✅ [Email Background Job] Gửi thành công email mời tham gia không gian làm việc \"{}\" tới {}",

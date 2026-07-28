@@ -1,20 +1,19 @@
 package com.example.smartmanager.workspaces;
 
-import com.example.smartmanager.users.UserEntity;
-import com.example.smartmanager.users.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-import java.util.UUID;
-
 import com.example.smartmanager.email.EmailJob;
 import com.example.smartmanager.email.EmailWorker;
 import com.example.smartmanager.notifications.NotificationService;
+import com.example.smartmanager.users.UserEntity;
+import com.example.smartmanager.users.UserRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
@@ -22,6 +21,19 @@ public class WorkspaceService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final RedisTemplate<String, Object> redisTemplate;
+
+    public WorkspaceService(
+            WorkspaceRepository workspaceRepository,
+            WorkspaceMemberRepository workspaceMemberRepository,
+            UserRepository userRepository,
+            NotificationService notificationService,
+            @Qualifier("redisTemplate") RedisTemplate<String, Object> redisTemplate) {
+        this.workspaceRepository = workspaceRepository;
+        this.workspaceMemberRepository = workspaceMemberRepository;
+        this.userRepository = userRepository;
+        this.notificationService = notificationService;
+        this.redisTemplate = redisTemplate;
+    }
 
     @Transactional
     public WorkspaceEntity createWorkspace(WorkspaceEntity workspace, String ownerId) {

@@ -270,11 +270,9 @@ public class TaskService {
         return saved;
     }
 
-    @Transactional
-    public List<TaskEntity> generateAiSubtasks(String taskId, String userId) {
+    public List<String> suggestAiSubtasks(String taskId) {
         TaskEntity task = getTaskById(taskId);
 
-        // Chuẩn bị prompt cho Gemini
         String prompt = String.format(
                 "Bạn là một kiến trúc sư phần mềm chuyên nghiệp. Nhiệm vụ của bạn là đọc tiêu đề và mô tả công việc sau, " +
                 "rồi phân tách nó thành các bước nhỏ hơn (sub-tasks) để lập trình viên thực hiện.\n" +
@@ -287,14 +285,24 @@ public class TaskService {
         );
 
         String rawResponse = openRouterServiceClient.generateContent(prompt);
-        List<String> titles = openRouterServiceClient.parseSubtasks(rawResponse);
+        return openRouterServiceClient.parseSubtasks(rawResponse);
+    }
 
+    @Transactional
+    public List<TaskEntity> addBatchSubtasks(String taskId, List<String> subtaskTitles, String userId) {
+        if (subtaskTitles == null || subtaskTitles.isEmpty()) {
+            return List.of();
+        }
+
+        TaskEntity task = getTaskById(taskId);
         List<TaskEntity> createdSubtasks = new ArrayList<>();
         double currentPosition = 1.0;
 
-        for (String title : titles) {
+        for (String title : subtaskTitles) {
+            if (title == null || title.trim().isEmpty()) continue;
+
             TaskEntity subtask = new TaskEntity();
-            subtask.setTitle(title);
+            subtask.setTitle(title.trim());
             subtask.setStatus("TODO");
             subtask.setPriority("MEDIUM");
             subtask.setPosition(currentPosition++);
@@ -314,12 +322,12 @@ public class TaskService {
                     userId != null ? UUID.fromString(userId) : null,
                     "CREATE",
                     null,
-                    "AI gợi ý tạo subtask cho task \"" + task.getTitle() + "\": " + title,
+                    "Tạo subtask cho task \"" + task.getTitle() + "\": " + title.trim(),
                     LocalDateTime.now()
             );
             taskLogRepository.save(log);
 
-            // Phát tin nhắn realtime qua WebSocket để client cập nhật subtasks
+            // Phát tin nhắn realtime qua WebSocket
             TaskMessage message = new TaskMessage(
                     "CREATE",
                     savedSub.getId().toString(),
@@ -331,5 +339,11 @@ public class TaskService {
         }
 
         return createdSubtasks;
+    }
+
+    @Transactional
+    public List<TaskEntity> generateAiSubtasks(String taskId, String userId) {
+        List<String> titles = suggestAiSubtasks(taskId);
+        return addBatchSubtasks(taskId, titles, userId);
     }
 }

@@ -123,6 +123,32 @@ public class TaskController {
         }
     }
 
+    @PostMapping("/{id}/suggest-subtasks")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
+    public ResponseEntity<?> suggestAiSubtasks(@PathVariable("id") String taskId) {
+        try {
+            List<String> suggestions = taskService.suggestAiSubtasks(taskId);
+            return ResponseEntity.ok(Map.of("suggestions", suggestions));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/batch-subtasks")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'MEMBER')")
+    public ResponseEntity<?> addBatchSubtasks(
+            @PathVariable("id") String taskId,
+            @RequestBody Map<String, List<String>> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            List<String> subtasks = body.get("subtasks");
+            List<TaskEntity> created = taskService.addBatchSubtasks(taskId, subtasks, userPrincipal.getId());
+            return ResponseEntity.ok(created);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/{id}/logs")
     @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
     public ResponseEntity<List<TaskLogEntity>> getTaskLogs(@PathVariable("id") String taskId) {

@@ -39,43 +39,54 @@ public class OpenRouterServiceClient {
             throw new IllegalStateException("AI không thể sử dụng do thiếu hoặc sai API Key. Vui lòng cấu hình OPENROUTER_API_KEY trong hệ thống.");
         }
 
-        try {
-            // Xây dựng request body chuẩn Chat Completions
-            Map<String, Object> message = new HashMap<>();
-            message.put("role", "user");
-            message.put("content", prompt);
+        // Danh sách model ưu tiên (bao gồm các model free và hiệu năng cao trên OpenRouter)
+        String[] models = new String[] {
+            "google/gemini-2.0-flash-exp:free",
+            "google/gemini-flash-1.5-8b:free",
+            "google/gemini-2.5-flash",
+            "meta-llama/llama-3.3-70b-instruct:free"
+        };
 
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", "google/gemini-2.5-flash"); // Model hiệu năng cao của Gemini trên OpenRouter
-            requestBody.put("messages", Collections.singletonList(message));
-            requestBody.put("max_tokens", 1500);
+        Exception lastException = null;
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + apiKey);
-            headers.set("HTTP-Referer", "http://localhost:3000"); // OpenRouter yêu cầu header này
-            headers.set("X-Title", "Smart Task Manager");
+        for (String model : models) {
+            try {
+                Map<String, Object> message = new HashMap<>();
+                message.put("role", "user");
+                message.put("content", prompt);
 
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(OPENROUTER_API_URL, entity, String.class);
+                Map<String, Object> requestBody = new HashMap<>();
+                requestBody.put("model", model);
+                requestBody.put("messages", Collections.singletonList(message));
+                requestBody.put("max_tokens", 800);
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode root = objectMapper.readTree(response.getBody());
-                JsonNode textNode = root.path("choices")
-                        .path(0)
-                        .path("message")
-                        .path("content");
-                return textNode.asText();
-            } else {
-                throw new RuntimeException("Phản hồi từ OpenRouter API không thành công.");
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("Authorization", "Bearer " + apiKey);
+                headers.set("HTTP-Referer", "http://localhost:3000");
+                headers.set("X-Title", "Smart Task Manager");
+
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+                ResponseEntity<String> response = restTemplate.postForEntity(OPENROUTER_API_URL, entity, String.class);
+
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    JsonNode root = objectMapper.readTree(response.getBody());
+                    JsonNode textNode = root.path("choices")
+                            .path(0)
+                            .path("message")
+                            .path("content");
+                    if (!textNode.isMissingNode() && !textNode.asText().isBlank()) {
+                        return textNode.asText();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Gọi OpenRouter API với model {} không thành công: {}. Đang thử model tiếp theo...", model, e.getMessage());
+                lastException = e;
             }
-        } catch (HttpClientErrorException e) {
-            log.error("Lỗi xác thực/HTTP khi gọi OpenRouter API: {}", e.getMessage());
-            throw new RuntimeException("AI không thể sử dụng do API Key sai hoặc không có quyền truy cập.");
-        } catch (Exception e) {
-            log.error("Lỗi khi kết nối với OpenRouter API", e);
-            throw new RuntimeException("AI không thể sử dụng do lỗi kết nối: " + e.getMessage());
         }
+
+        log.error("Tất cả các model AI đều không khả dụng", lastException);
+        throw new RuntimeException("AI không thể phản hồi do giới hạn API Key / Token từ nhà cung cấp.");
     }
 
     /**

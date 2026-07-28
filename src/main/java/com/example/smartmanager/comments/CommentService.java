@@ -84,4 +84,85 @@ public class CommentService {
     public List<CommentEntity> getTaskComments(String taskId) {
         return commentRepository.findByTaskIdOrderByCreatedAtAsc(UUID.fromString(taskId));
     }
+
+    @Transactional
+    public CommentEntity updateComment(String commentId, String newContent, String userId) {
+        CommentEntity comment = commentRepository.findById(UUID.fromString(commentId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bình luận"));
+
+        if (!comment.getUserId().toString().equals(userId)) {
+            throw new IllegalArgumentException("Bạn không có quyền chỉnh sửa bình luận này");
+        }
+
+        comment.setContent(newContent);
+        comment.setUpdatedAt(LocalDateTime.now());
+        CommentEntity saved = commentRepository.save(comment);
+
+        TaskEntity task = taskRepository.findById(saved.getTaskId()).orElse(null);
+        if (task != null) {
+            TaskMessage message = new TaskMessage(
+                    "UPDATE_COMMENT",
+                    saved.getTaskId().toString(),
+                    task.getProjectId().toString(),
+                    saved,
+                    userId
+            );
+            messagingTemplate.convertAndSend("/topic/projects/" + task.getProjectId().toString(), message);
+        }
+
+        return saved;
+    }
+
+    @Transactional
+    public void deleteComment(String commentId, String userId) {
+        CommentEntity comment = commentRepository.findById(UUID.fromString(commentId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bình luận"));
+
+        if (!comment.getUserId().toString().equals(userId)) {
+            throw new IllegalArgumentException("Bạn không có quyền xóa bình luận này");
+        }
+
+        commentRepository.delete(comment);
+
+        TaskEntity task = taskRepository.findById(comment.getTaskId()).orElse(null);
+        if (task != null) {
+            TaskMessage message = new TaskMessage(
+                    "DELETE_COMMENT",
+                    comment.getTaskId().toString(),
+                    task.getProjectId().toString(),
+                    comment,
+                    userId
+            );
+            messagingTemplate.convertAndSend("/topic/projects/" + task.getProjectId().toString(), message);
+        }
+    }
+
+    @Transactional
+    public CommentEntity toggleLike(String commentId, String userId) {
+        CommentEntity comment = commentRepository.findById(UUID.fromString(commentId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bình luận"));
+
+        UUID userUuid = UUID.fromString(userId);
+        if (comment.getLikedUserIds().contains(userUuid)) {
+            comment.getLikedUserIds().remove(userUuid);
+        } else {
+            comment.getLikedUserIds().add(userUuid);
+        }
+
+        CommentEntity saved = commentRepository.save(comment);
+
+        TaskEntity task = taskRepository.findById(saved.getTaskId()).orElse(null);
+        if (task != null) {
+            TaskMessage message = new TaskMessage(
+                    "LIKE_COMMENT",
+                    saved.getTaskId().toString(),
+                    task.getProjectId().toString(),
+                    saved,
+                    userId
+            );
+            messagingTemplate.convertAndSend("/topic/projects/" + task.getProjectId().toString(), message);
+        }
+
+        return saved;
+    }
 }

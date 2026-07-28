@@ -36,4 +36,42 @@ public class CommentController {
         List<CommentEntity> comments = commentService.getTaskComments(taskId);
         return ResponseEntity.ok(comments);
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateComment(
+            @PathVariable("id") String commentId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            String content = body.get("content");
+            CommentEntity updated = commentService.updateComment(commentId, content, userPrincipal.getId());
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteComment(
+            @PathVariable("id") String commentId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            commentService.deleteComment(commentId, userPrincipal.getId());
+            return ResponseEntity.ok(Map.of("message", "Đã xóa bình luận thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/{id}/like")
+    public ResponseEntity<?> toggleLike(
+            @PathVariable("id") String commentId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            CommentEntity updated = commentService.toggleLike(commentId, userPrincipal.getId());
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

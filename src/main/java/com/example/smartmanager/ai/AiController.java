@@ -23,4 +23,21 @@ public class AiController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PostMapping("/project/{projectId}/smart-search")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
+    public ResponseEntity<?> smartSearch(
+            @PathVariable("projectId") String projectId,
+            @RequestBody Map<String, String> body) {
+        try {
+            String query = body.get("query");
+            if (query == null || query.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Từ khóa tìm kiếm không được để trống"));
+            }
+            java.util.List<AiSearchResultDto> results = aiService.smartSearchTasks(projectId, query);
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

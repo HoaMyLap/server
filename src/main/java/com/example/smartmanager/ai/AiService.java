@@ -117,4 +117,95 @@ public class AiService {
 
         return openRouterServiceClient.generateContent(prompt);
     }
+
+    public List<AiSearchResultDto> smartSearchTasks(String projectId, String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+
+        UUID projectUuid = UUID.fromString(projectId);
+        List<TaskEntity> tasks = taskRepository.findByProjectId(projectUuid);
+        if (tasks.isEmpty()) {
+            return List.of();
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (TaskEntity t : tasks) {
+            sb.append(String.format(
+                    "{\"id\":\"%s\",\"title\":\"%s\",\"description\":\"%s\",\"status\":\"%s\",\"priority\":\"%s\",\"dueDate\":\"%s\"}\n",
+                    t.getId(),
+                    t.getTitle().replace("\"", "'"),
+                    t.getDescription() != null ? t.getDescription().replace("\"", "'") : "",
+                    t.getStatus(),
+                    t.getPriority(),
+                    t.getDueDate() != null ? t.getDueDate() : "None"
+            ));
+        }
+
+        String prompt = String.format("""
+                Bạn là hệ thống AI Tìm kiếm Thông minh (Semantic Search) cho ứng dụng quản lý công việc.
+                Người dùng đưa ra câu truy vấn tìm kiếm bằng ngôn ngữ tự nhiên: "%s"
+
+                Danh sách công việc trong dự án hiện tại (JSON):
+                %s
+
+                Nhiệm vụ:
+                Phân tích ngữ nghĩa câu truy vấn (ý định, mức độ ưu tiên, hạn chót, trạng thái, từ khóa liên quan, v.v.) và đánh giá mức độ phù hợp với từng công việc.
+                
+                Trả về DUY NHẤT một mảng JSON các công việc phù hợp (sắp xếp theo điểm phù hợp giảm dần), mỗi mục có dạng:
+                {
+                  "taskId": "UUID của task",
+                  "relevanceScore": 0.95,
+                  "reason": "Giải thích ngắn gọn 1 câu bằng tiếng Việt tại sao task này khớp với truy vấn"
+                }
+
+                CHỈ trả về mảng JSON, không viết lời mở đầu hay kết luận.
+                """, query, sb.toString());
+
+        try {
+            String rawResponse = openRouterServiceClient.generateContent(prompt);
+            return parseSearchResults(rawResponse, tasks);
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private List<AiSearchResultDto> parseSearchResults(String rawResponse, List<TaskEntity> allTasks) {
+        List<AiSearchResultDto> results = new java.util.ArrayList<>();
+        if (rawResponse == null || rawResponse.trim().isEmpty()) {
+            return results;
+        }
+
+        String cleaned = rawResponse.trim();
+        if (cleaned.startsWith("```")) {
+            int firstLineBreak = cleaned.indexOf("\n");
+            int lastBackticks = cleaned.lastIndexOf("```");
+            if (firstLineBreak != -1 && lastBackticks > firstLineBreak) {
+                cleaned = cleaned.substring(firstLineBreak + 1, lastBackticks).trim();
+            }
+        }
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(cleaned);
+            if (root.isArray()) {
+                java.util.Map<String, TaskEntity> taskMap = allTasks.stream()
+                        .collect(Collectors.toMap(t -> t.getId().toString(), t -> t));
+
+                for (com.fasterxml.jackson.databind.JsonNode node : root) {
+                    String taskId = node.path("taskId").asText();
+                    double score = node.path("relevanceScore").asDouble(0.85);
+                    String reason = node.path("reason").asText("Khớp với yêu cầu tìm kiếm");
+
+                    TaskEntity task = taskMap.get(taskId);
+                    if (task != null) {
+                        results.add(new AiSearchResultDto(task, score, reason));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Fallback: nếu AI trả về chuỗi thay vì JSON chuẩn
+        }
+        return results;
+    }
 }

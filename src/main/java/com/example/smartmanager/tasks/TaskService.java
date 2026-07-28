@@ -231,6 +231,45 @@ public class TaskService {
         return saved;
     }
 
+    public List<TaskLogEntity> getTaskLogs(String taskId) {
+        return taskLogRepository.findByTaskIdOrderByCreatedAtDesc(UUID.fromString(taskId));
+    }
+
+    @Transactional
+    public TaskEntity toggleTaskDone(String taskId, String userId) {
+        TaskEntity task = getTaskById(taskId);
+        String oldStatus = task.getStatus();
+        String newStatus = "DONE".equals(oldStatus) ? "TODO" : "DONE";
+
+        task.setStatus(newStatus);
+        task.setUpdatedAt(LocalDateTime.now());
+        TaskEntity saved = taskRepository.save(task);
+
+        // Ghi log hoạt động
+        TaskLogEntity log = new TaskLogEntity(
+                null,
+                saved.getId(),
+                userId != null ? UUID.fromString(userId) : null,
+                "UPDATE_STATUS",
+                oldStatus,
+                newStatus,
+                LocalDateTime.now()
+        );
+        taskLogRepository.save(log);
+
+        // Phát tin nhắn realtime qua WebSocket
+        TaskMessage message = new TaskMessage(
+                "UPDATE",
+                saved.getId().toString(),
+                saved.getProjectId().toString(),
+                saved,
+                userId
+        );
+        messagingTemplate.convertAndSend("/topic/projects/" + saved.getProjectId().toString(), message);
+
+        return saved;
+    }
+
     @Transactional
     public List<TaskEntity> generateAiSubtasks(String taskId, String userId) {
         TaskEntity task = getTaskById(taskId);

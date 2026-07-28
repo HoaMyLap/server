@@ -122,4 +122,24 @@ public class TaskController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/{id}/logs")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
+    public ResponseEntity<List<TaskLogEntity>> getTaskLogs(@PathVariable("id") String taskId) {
+        List<TaskLogEntity> logs = taskService.getTaskLogs(taskId);
+        return ResponseEntity.ok(logs);
+    }
+
+    @PatchMapping("/{id}/toggle-done")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'MEMBER')")
+    public ResponseEntity<?> toggleSubtaskDone(
+            @PathVariable("id") String taskId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            TaskEntity updated = taskService.toggleTaskDone(taskId, userPrincipal.getId());
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

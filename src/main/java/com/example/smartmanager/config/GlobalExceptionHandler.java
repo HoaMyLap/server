@@ -23,6 +23,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", exc.getMessage()));
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<?> handleAccessDenied(org.springframework.security.access.AccessDeniedException exc) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Bạn không có quyền truy cập tài nguyên này."));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneralException(Exception exc) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

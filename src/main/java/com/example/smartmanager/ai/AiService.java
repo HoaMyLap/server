@@ -74,18 +74,32 @@ public class AiService {
 
         // Tạo prompt yêu cầu cấu trúc phân tích song song lồng ghép biểu đồ dạng JSON
         String prompt = String.format(
-                "Bạn là một quản lý dự án công nghệ chuyên nghiệp. Hãy đọc danh sách các công việc hiện tại và nhật ký hoạt động dưới đây để viết báo cáo tiến độ dự án dưới dạng phân tích song song kèm biểu đồ.\n\n" +
+                "Bạn là một chuyên gia quản lý dự án công nghệ cấp cao (Senior Technical Program Manager) của hệ thống Homix v2.0.\n" +
+                "Hãy phân tích chuyên sâu danh sách các công việc và nhật ký hoạt động dưới đây để lập 'BÁO CÁO NGHIỆM THU DỰ ÁN' chi tiết và toàn diện.\n\n" +
                 "%s\n\n" +
                 "%s\n\n" +
                 "Yêu cầu QUAN TRỌNG về định dạng JSON:\n" +
-                "1. Trả về DUY NHẤT một mảng JSON hợp lệ bắt đầu bằng [ và kết thúc bằng ]. KHÔNG có bất kỳ văn bản, giải thích hay code block nào bên ngoài.\n" +
+                "1. Trả về DUY NHẤT một mảng JSON hợp lệ gồm 4 mục chính bắt đầu bằng [ và kết thúc bằng ]. KHÔNG có bất kỳ văn bản, giải thích hay code block nào bên ngoài.\n" +
                 "2. MỌI giá trị chuỗi (string) TUYỆT ĐỐI KHÔNG được chứa dấu ngoặc kép (\") bên trong. Thay bằng dấu nháy đơn (') nếu cần trích dẫn.\n" +
                 "3. MỌI giá trị chuỗi phải nằm TRÊN MỘT DÒNG DUY NHẤT, không xuống dòng, không có ký tự \\n thô bên trong chuỗi.\n" +
-                "4. Trường 'content' và 'insight' phải là một đoạn văn liên tục, không xuống dòng, không dùng ký tự đặc biệt markdown như **, ##, --.\n\n" +
+                "4. Trường 'content' và 'insight' phải là một đoạn văn phân tích chuyên sâu (tối thiểu 3-4 câu), viết liên tục không xuống dòng, không dùng ký tự đặc biệt markdown như **, ##, --.\n\n" +
+                "4 Mục chính bắt buộc trong báo cáo:\n" +
+                "Mục 1. Title: '1. Báo cáo Tiến độ Tổng quan & Tỷ lệ Hoàn thành'\n" +
+                "  -> Content: Đánh giá chi tiết tỷ lệ hoàn thành công việc, số lượng công việc đã hoàn thành so với tồn đọng.\n" +
+                "  -> Chart: chartType 'doughnut' (Completion Rate)\n\n" +
+                "Mục 2. Title: '2. Phân tích Tải Công việc & Đóng góp Nhân sự'\n" +
+                "  -> Content: Phân tích chi tiết mức độ phân bổ công việc theo mức độ ưu tiên và trạng thái công việc hiện tại.\n" +
+                "  -> Chart: chartType 'bar' hoặc 'horizontalBar' (Workload & Priority Distribution)\n\n" +
+                "Mục 3. Title: '3. Đánh giá Rủi ro, Điểm nghẽn & Chất lượng Nghiệm thu'\n" +
+                "  -> Content: Đánh giá các nguy cơ chậm hạn (overdue), các task có ưu tiên HIGH/URGENT còn tồn đọng và điểm nghẽn tiến độ.\n" +
+                "  -> Chart: chartType 'radar' hoặc 'stackedBar' (Risk Assessment & Severity)\n\n" +
+                "Mục 4. Title: '4. Dự báo Hoàn thành & Đề xuất Cải tiến Chiến lược'\n" +
+                "  -> Content: Dự báo khả năng hoàn thành toàn bộ dự án, đưa ra các giải pháp hành động cụ thể để tối ưu hiệu suất làm việc.\n" +
+                "  -> Chart: chartType 'line' (Sprint Burndown / Progress Forecast)\n\n" +
                 "Mỗi mục báo cáo trong mảng phải có cấu trúc chính xác như sau:\n" +
                 "{\n" +
                 "  \"title\": \"Tiêu đề mục phân tích\",\n" +
-                "  \"content\": \"Văn bản phân tích xu hướng chi tiết viết liên tục trên một dòng không xuống dòng không dùng ngoặc kép\",\n" +
+                "  \"content\": \"Đoạn văn phân tích chuyên sâu viết trên một dòng không xuống dòng không dùng ngoặc kép\",\n" +
                 "  \"chart\": {\n" +
                 "    \"title\": \"Tên biểu đồ\",\n" +
                 "    \"chartType\": \"doughnut\" | \"pie\" | \"line\" | \"horizontalBar\" | \"stackedBar\" | \"radar\" | \"bar\",\n" +
@@ -96,20 +110,9 @@ public class AiService {
                 "        \"data\": [10, 20]\n" +
                 "      }\n" +
                 "    ],\n" +
-                "    \"insight\": \"Nhận xét ngắn gọn viết liên tục trên một dòng không dùng ngoặc kép\"\n" +
+                "    \"insight\": \"Nhận xét chiến lược ngắn gọn viết trên một dòng không dùng ngoặc kép\"\n" +
                 "  }\n" +
                 "}\n\n" +
-                "Nếu một mục không cần biểu đồ, đặt \"chart\": null.\n\n" +
-                "Lồng ghép biểu đồ thống kê thực tế vào các mục phù hợp:\n" +
-                "1. Completion Rate (doughnut)\n" +
-                "2. Task Status (pie)\n" +
-                "3. Tasks by Day (line)\n" +
-                "4. Tasks by Member (horizontalBar)\n" +
-                "5. Bug Severity (stackedBar)\n" +
-                "6. Progress Timeline (line)\n" +
-                "7. Sprint Burndown (line)\n" +
-                "8. Team Productivity (radar)\n" +
-                "9. Workload Distribution (bar)\n\n" +
                 "Tính toán số liệu thống kê thực tế chính xác dựa trên dữ liệu dự án đã cung cấp ở trên.",
                 tasksBuilder.toString(),
                 logsBuilder.toString()

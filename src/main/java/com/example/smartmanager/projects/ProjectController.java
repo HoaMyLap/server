@@ -1,9 +1,11 @@
 package com.example.smartmanager.projects;
 
+import com.example.smartmanager.auth.UserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
@@ -17,9 +19,11 @@ public class ProjectController {
 
     @PostMapping
     @PreAuthorize("@securityService.hasWorkspaceRole(#project.workspaceId.toString(), 'MEMBER')")
-    public ResponseEntity<?> createProject(@Valid @RequestBody ProjectEntity project) {
+    public ResponseEntity<?> createProject(
+            @Valid @RequestBody ProjectEntity project,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
         try {
-            ProjectEntity created = projectService.createProject(project);
+            ProjectEntity created = projectService.createProject(project, userPrincipal.getId());
             return ResponseEntity.ok(created);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -28,8 +32,10 @@ public class ProjectController {
 
     @GetMapping("/workspace/{workspaceId}")
     @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
-    public ResponseEntity<List<ProjectEntity>> getWorkspaceProjects(@PathVariable("workspaceId") String workspaceId) {
-        List<ProjectEntity> projects = projectService.getWorkspaceProjects(workspaceId);
+    public ResponseEntity<List<ProjectEntity>> getWorkspaceProjects(
+            @PathVariable("workspaceId") String workspaceId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        List<ProjectEntity> projects = projectService.getWorkspaceProjects(workspaceId, userPrincipal.getId());
         return ResponseEntity.ok(projects);
     }
 

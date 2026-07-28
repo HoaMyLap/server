@@ -19,6 +19,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.example.smartmanager.projects.ProjectMemberEntity;
+import com.example.smartmanager.projects.ProjectMemberId;
+import com.example.smartmanager.projects.ProjectMemberRepository;
+
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -28,6 +32,7 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -185,10 +190,27 @@ public class NotificationService {
             invitation.setUpdatedAt(LocalDateTime.now());
             invitationRepository.save(invitation);
 
-            // Thêm người dùng vào Workspace Member
-            WorkspaceMemberId memberId = new WorkspaceMemberId(workspaceIdToJoin, user.getId());
-            WorkspaceMemberEntity member = new WorkspaceMemberEntity(memberId, invitation.getRole(), LocalDateTime.now());
-            workspaceMemberRepository.save(member);
+            if ("PROJECT".equalsIgnoreCase(invitation.getTargetType())) {
+                // Thêm vào Workspace Member (role VIEWER) nếu chưa là thành viên workspace
+                WorkspaceMemberId memberId = new WorkspaceMemberId(workspaceIdToJoin, user.getId());
+                if (!workspaceMemberRepository.existsById(memberId)) {
+                    workspaceMemberRepository.save(new WorkspaceMemberEntity(memberId, "VIEWER", LocalDateTime.now()));
+                }
+                // Thêm vào project_members cho riêng dự án được mời
+                ProjectMemberId pmId = new ProjectMemberId(invitation.getTargetId(), user.getId());
+                projectMemberRepository.save(new ProjectMemberEntity(pmId, invitation.getRole(), LocalDateTime.now()));
+            } else {
+                // Thêm vào Workspace Member với vai trò được mời
+                WorkspaceMemberId memberId = new WorkspaceMemberId(workspaceIdToJoin, user.getId());
+                workspaceMemberRepository.save(new WorkspaceMemberEntity(memberId, invitation.getRole(), LocalDateTime.now()));
+
+                // Thêm người dùng vào tất cả dự án hiện có của Workspace
+                List<ProjectEntity> allProjects = projectRepository.findByWorkspaceId(workspaceIdToJoin);
+                for (ProjectEntity p : allProjects) {
+                    ProjectMemberId pmId = new ProjectMemberId(p.getId(), user.getId());
+                    projectMemberRepository.save(new ProjectMemberEntity(pmId, invitation.getRole(), LocalDateTime.now()));
+                }
+            }
 
             // Gửi thông báo cho người mời
             createNotification(

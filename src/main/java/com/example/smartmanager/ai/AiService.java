@@ -131,7 +131,7 @@ public class AiService {
 
         promptSb.append("Mục 5. Title: '5. Kế hoạch Bứt phá & Dự báo Hoàn thành Dự án'\n");
         promptSb.append("  -> Content: Xây dựng kế hoạch hành động 4 bước bao gồm: tái phân bổ nguồn lực, giải quyết task tồn đọng, tăng cường kiểm thử nghiệm thu và dự báo thời gian hoàn thiện 100% toàn bộ dự án.\n");
-        promptSb.append(String.format("  -> Chart: chartType 'line' (Title: 'LỘ TRÌNH DỰ BÁO', Labels: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'], Datasets: [{ 'label': 'Tiến độ %', 'data': [%d, %d, %d, 100] }])\n\n", (int) Math.min(completionRate, 30), (int) Math.min(completionRate + 25, 60), (int) Math.min(completionRate + 50, 85)));
+        promptSb.append(String.format("  -> Chart: chartType 'line' (Title: 'LỘ TRÌNH DỰ BÁO', Labels: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'], Datasets: [{ 'label': 'Tiến độ %%', 'data': [%d, %d, %d, 100] }])\n\n", (int) Math.min(completionRate, 30), (int) Math.min(completionRate + 25, 60), (int) Math.min(completionRate + 50, 85)));
 
         promptSb.append("Mẫu định dạng JSON mỗi phần tử:\n");
         promptSb.append("{\n");

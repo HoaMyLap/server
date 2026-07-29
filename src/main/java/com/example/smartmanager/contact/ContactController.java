@@ -73,8 +73,11 @@ public class ContactController {
 
                 log.info("✅ Gửi email thông báo liên hệ THÀNH CÔNG cho khách hàng {}", email);
             } catch (Exception e) {
-                log.warn("⚠️ Gửi email thông báo liên hệ thất bại: {}", e.getMessage());
+                log.error("❌ Lỗi gửi email thông báo liên hệ qua Gmail: ", e);
+                return ResponseEntity.badRequest().body(Map.of("error", "Lỗi gửi email: " + e.getMessage()));
             }
+        } else if (mailSender == null) {
+            log.warn("⚠️ JavaMailSender is NULL! Mail service is not auto-configured.");
         }
 
         return ResponseEntity.ok(Map.of(

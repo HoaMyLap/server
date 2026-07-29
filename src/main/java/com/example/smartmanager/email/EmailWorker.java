@@ -48,8 +48,24 @@ public class EmailWorker {
         while (running) {
             try {
                 Object rawJob = redisTemplate.opsForList().rightPop(QUEUE_NAME, 5, TimeUnit.SECONDS);
-                if (rawJob instanceof EmailJob job) {
-                    processEmailJob(job);
+                if (rawJob != null) {
+                    EmailJob job = null;
+                    if (rawJob instanceof EmailJob ej) {
+                        job = ej;
+                    } else if (rawJob instanceof java.util.Map map) {
+                        job = new EmailJob(
+                            (String) map.get("recipientEmail"),
+                            (String) map.get("workspaceId"),
+                            (String) map.get("workspaceName"),
+                            (String) map.get("role"),
+                            (String) map.get("inviterName"),
+                            (String) map.get("subject"),
+                            (String) map.get("content")
+                        );
+                    }
+                    if (job != null && job.getRecipientEmail() != null) {
+                        processEmailJob(job);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Lỗi xảy ra trong Email Queue Worker: {}", e.getMessage());

@@ -100,55 +100,54 @@ public class AiService {
                 urgentCount, highCount, mediumCount, lowCount, overdueCount, logs.size()
         );
 
-        // Prompt yêu cầu chuyên sâu PMO Audit Report
-        String prompt = String.format(
-                "Bạn là Giám đốc Quản lý Dự án Công nghệ Cấp cao (Chief PMO & Senior Agile Technical Auditor) thuộc hệ thống Homix v2.0.\n" +
-                "Nhiệm vụ: Lập BÁO CÁO NGHIỆM THU DỰ ÁN VÀ ĐÁNH GIÁ QUẢN TRỊ CHI TIẾT TOÀN DIỆN dành cho Ban Giám đốc dựa trên dữ liệu thống kê bên dưới.\n\n" +
-                "%s\n\n" +
-                "%s\n\n" +
-                "%s\n\n" +
-                "QUY TẮC ĐỊNH DẠNG JSON & CẤU TRÚC BẮT BUỘC:\n" +
-                "1. Trả về DUY NHẤT một mảng JSON hợp lệ gồm ĐÚNG 5 MỤC CHÍNH (bắt đầu bằng [ và kết thúc bằng ]). KHÔNG được bỏ bớt bất kỳ mục nào.\n" +
-                "2. MỌI giá trị chuỗi (string) TUYỆT ĐỐI KHÔNG chứa dấu ngoặc kép (\"). Nếu cần trích dẫn, hãy dùng nháy đơn (').\n" +
-                "3. Mỗi mục phải phân tích thật CHUYÊN SÂU, ĐẦY ĐỦ THÔNG TIN NGHỆP VỤ (tối thiểu 4-6 câu hoàn chỉnh, chi tiết sắc bén), nằm trên MỘT DÒNG DUY NHẤT, không có ký tự \\n thô.\n" +
-                "4. Dựa trên số liệu thực tế đã cung cấp để xuất số liệu biểu đồ chính xác 100%%.\n\n" +
-                "DANH SÁCH ĐỦ 5 MỤC CHÍNH BẮT BUỘC:\n" +
-                "Mục 1. Title: '1. Tóm tắt Quản trị & Chỉ số Sức khỏe Dự án'\n" +
-                "  -> Content: Phân tích đánh giá tổng quan về sức khỏe dự án, tỷ lệ hoàn thành %.1f%% (%d/%d task), đánh giá về Sprint velocity, hiệu suất vận hành bộ máy và năng lực hoàn thành cam kết.\n" +
-                "  -> Chart: chartType 'doughnut' (Title: 'TIẾN ĐỘ DỰ ÁN', Labels: ['Đã xong', 'Đang làm', 'Cần làm'], Datasets: [{ 'label': 'Số lượng', 'data': [%d, %d, %d] }])\n\n" +
-                "Mục 2. Title: '2. Phân bổ Khối lượng & Ma trận Ưu tiên Công việc'\n" +
-                "  -> Content: Phân tích chi tiết sự cân bằng trong ma trận phân bổ công việc theo độ ưu tiên (Khẩn cấp: %d, Cao: %d, Trung bình: %d, Thấp: %d). Đánh giá rủi ro dồn tải công việc và hiện tượng thắt nút cổ chai (bottleneck).\n" +
-                "  -> Chart: chartType 'bar' (Title: 'MA TRẬN ƯU TIÊN', Labels: ['Khẩn cấp', 'Cao', 'Trung bình', 'Thấp'], Datasets: [{ 'label': 'Số task', 'data': [%d, %d, %d, %d] }])\n\n" +
-                "Mục 3. Title: '3. Đánh giá Rủi ro, Điểm nghẽn & Task Quá hạn'\n" +
-                "  -> Content: Kiểm toán toàn diện rủi ro tiến độ với %d task quá hạn và các hạng mục URGENT/HIGH chưa hoàn thành. Phân tích nguyên nhân chậm trễ và chỉ ra các khu vực có nguy cơ đổ vỡ deadline.\n" +
-                "  -> Chart: chartType 'radar' (Title: 'MỨC ĐỘ RỦI RO', Labels: ['Quá hạn', 'Khẩn cấp tồn', 'Thiếu nhân lực', 'Rủi ro kĩ thuật', 'Trễ mốc'], Datasets: [{ 'label': 'Chỉ số rủi ro', 'data': [%d, %d, %d, %d, %d] }])\n\n" +
-                "Mục 4. Title: '4. Phân tích Hoạt động Nhóm & Nhịp độ Vận hành 24h'\n" +
-                "  -> Content: Phân tích tần suất tương tác của đội ngũ qua %d nhật ký hoạt động trong 24h qua. Đánh giá nhịp độ cập nhật trạng thái, tinh thần chủ động phối hợp giữa các thành viên.\n" +
-                "  -> Chart: chartType 'stackedBar' (Title: 'NHỊP ĐỘ 24H', Labels: ['Sáng', 'Chiều', 'Tối', 'Đêm'], Datasets: [{ 'label': 'Hoạt động', 'data': [%d, %d, %d, %d] }])\n\n" +
-                "Mục 5. Title: '5. Kế hoạch Bứt phá & Dự báo Hoàn thành Dự án'\n" +
-                "  -> Content: Xây dựng kế hoạch hành động 4 bước bao gồm: tái phân bổ nguồn lực, giải quyết task tồn đọng, tăng cường kiểm thử nghiệm thu và dự báo thời gian hoàn thiện 100%% toàn bộ dự án.\n" +
-                "  -> Chart: chartType 'line' (Title: 'LỘ TRÌNH DỰ BÁO', Labels: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'], Datasets: [{ 'label': 'Tiến độ %', 'data': [%d, %d, %d, 100] }])\n\n" +
-                "Mẫu định dạng JSON mỗi phần tử:\n" +
-                "{\n" +
-                "  \"title\": \"Tiêu đề mục\",\n" +
-                "  \"content\": \"Đoạn văn phân tích chuyên sâu 4-6 câu viết trên một dòng không dùng ngoặc kép\",\n" +
-                "  \"chart\": {\n" +
-                "    \"title\": \"Tên biểu đồ\",\n" +
-                "    \"chartType\": \"doughnut\" | \"bar\" | \"radar\" | \"stackedBar\" | \"line\",\n" +
-                "    \"labels\": [\"Nhãn 1\", \"Nhãn 2\"],\n" +
-                "    \"datasets\": [{ \"label\": \"Số lượng\", \"data\": [10, 20] }],\n" +
-                "    \"insight\": \"Nhận xét chiến lược ngắn gọn viết trên một dòng\"\n" +
-                "  }\n" +
-                "}",
-                metricsSummary, tasksBuilder.toString(), logsBuilder.toString(),
-                completionRate, doneCount, totalCount, doneCount, inProgressCount, todoCount,
-                urgentCount, highCount, mediumCount, lowCount, urgentCount, highCount, mediumCount, lowCount,
-                overdueCount, overdueCount, urgentCount, (overdueCount > 0 ? 3 : 1), 2, 1,
-                logs.size(), (logs.size() / 4 + 1), (logs.size() / 2 + 1), (logs.size() / 4), 0,
-                (int) Math.min(completionRate, 30), (int) Math.min(completionRate + 25, 60), (int) Math.min(completionRate + 50, 85)
-        );
+        StringBuilder promptSb = new StringBuilder();
+        promptSb.append("Bạn là Giám đốc Quản lý Dự án Công nghệ Cấp cao (Chief PMO & Senior Agile Technical Auditor) thuộc hệ thống Homix v2.0.\n");
+        promptSb.append("Nhiệm vụ: Lập BÁO CÁO NGHIỆM THU DỰ ÁN VÀ ĐÁNH GIÁ QUẢN TRỊ CHI TIẾT TOÀN DIỆN dành cho Ban Giám đốc dựa trên dữ liệu thống kê bên dưới.\n\n");
+        promptSb.append(metricsSummary).append("\n\n");
+        promptSb.append(tasksBuilder).append("\n\n");
+        promptSb.append(logsBuilder).append("\n\n");
+        promptSb.append("QUY TẮC ĐỊNH DẠNG JSON & CẤU TRÚC BẮT BUỘC:\n");
+        promptSb.append("1. Trả về DUY NHẤT một mảng JSON hợp lệ gồm ĐÚNG 5 MỤC CHÍNH (bắt đầu bằng [ và kết thúc bằng ]). KHÔNG được bỏ bớt bất kỳ mục nào.\n");
+        promptSb.append("2. MỌI giá trị chuỗi (string) TUYỆT ĐỐI KHÔNG chứa dấu ngoặc kép (\"). Nếu cần trích dẫn, hãy dùng nháy đơn (').\n");
+        promptSb.append("3. Mỗi mục phải phân tích thật CHUYÊN SÂU, ĐẦY ĐỦ THÔNG TIN NGHỆP VỤ (tối thiểu 4-6 câu hoàn chỉnh, chi tiết sắc bén), nằm trên MỘT DÒNG DUY NHẤT, không có ký tự \\n thô.\n");
+        promptSb.append("4. Dựa trên số liệu thực tế đã cung cấp để xuất số liệu biểu đồ chính xác 100%.\n\n");
 
-        return openRouterServiceClient.generateContent(prompt);
+        promptSb.append("DANH SÁCH ĐỦ 5 MỤC CHÍNH BẮT BUỘC:\n");
+        promptSb.append("Mục 1. Title: '1. Tóm tắt Quản trị & Chỉ số Sức khỏe Dự án'\n");
+        promptSb.append(String.format("  -> Content: Phân tích đánh giá tổng quan về sức khỏe dự án, tỷ lệ hoàn thành %.1f%% (%d/%d task), đánh giá về Sprint velocity, hiệu suất vận hành bộ máy và năng lực hoàn thành cam kết.\n", completionRate, doneCount, totalCount));
+        promptSb.append(String.format("  -> Chart: chartType 'doughnut' (Title: 'TIẾN ĐỘ DỰ ÁN', Labels: ['Đã xong', 'Đang làm', 'Cần làm'], Datasets: [{ 'label': 'Số lượng', 'data': [%d, %d, %d] }])\n\n", doneCount, inProgressCount, todoCount));
+
+        promptSb.append("Mục 2. Title: '2. Phân bổ Khối lượng & Ma trận Ưu tiên Công việc'\n");
+        promptSb.append(String.format("  -> Content: Phân tích chi tiết sự cân bằng trong ma trận phân bổ công việc theo độ ưu tiên (Khẩn cấp: %d, Cao: %d, Trung bình: %d, Thấp: %d). Đánh giá rủi ro dồn tải công việc và hiện tượng thắt nút cổ chai (bottleneck).\n", urgentCount, highCount, mediumCount, lowCount));
+        promptSb.append(String.format("  -> Chart: chartType 'bar' (Title: 'MA TRẬN ƯU TIÊN', Labels: ['Khẩn cấp', 'Cao', 'Trung bình', 'Thấp'], Datasets: [{ 'label': 'Số task', 'data': [%d, %d, %d, %d] }])\n\n", urgentCount, highCount, mediumCount, lowCount));
+
+        promptSb.append("Mục 3. Title: '3. Đánh giá Rủi ro, Điểm nghẽn & Task Quá hạn'\n");
+        promptSb.append(String.format("  -> Content: Kiểm toán toàn diện rủi ro tiến độ với %d task quá hạn và các hạng mục URGENT/HIGH chưa hoàn thành. Phân tích nguyên nhân chậm trễ và chỉ ra các khu vực có nguy cơ đổ vỡ deadline.\n", overdueCount));
+        promptSb.append(String.format("  -> Chart: chartType 'radar' (Title: 'MỨC ĐỘ RỦI RO', Labels: ['Quá hạn', 'Khẩn cấp tồn', 'Thiếu nhân lực', 'Rủi ro kĩ thuật', 'Trễ mốc'], Datasets: [{ 'label': 'Chỉ số rủi ro', 'data': [%d, %d, %d, 2, 1] }])\n\n", overdueCount, urgentCount, (overdueCount > 0 ? 3 : 1)));
+
+        promptSb.append("Mục 4. Title: '4. Phân tích Hoạt động Nhóm & Nhịp độ Vận hành 24h'\n");
+        promptSb.append(String.format("  -> Content: Phân tích tần suất tương tác của đội ngũ qua %d nhật ký hoạt động trong 24h qua. Đánh giá nhịp độ cập nhật trạng thái, tinh thần chủ động phối hợp giữa các thành viên.\n", logs.size()));
+        promptSb.append(String.format("  -> Chart: chartType 'stackedBar' (Title: 'NHỊP ĐỘ 24H', Labels: ['Sáng', 'Chiều', 'Tối', 'Đêm'], Datasets: [{ 'label': 'Hoạt động', 'data': [%d, %d, %d, 0] }])\n\n", (int)(logs.size() / 4 + 1), (int)(logs.size() / 2 + 1), (int)(logs.size() / 4)));
+
+        promptSb.append("Mục 5. Title: '5. Kế hoạch Bứt phá & Dự báo Hoàn thành Dự án'\n");
+        promptSb.append("  -> Content: Xây dựng kế hoạch hành động 4 bước bao gồm: tái phân bổ nguồn lực, giải quyết task tồn đọng, tăng cường kiểm thử nghiệm thu và dự báo thời gian hoàn thiện 100% toàn bộ dự án.\n");
+        promptSb.append(String.format("  -> Chart: chartType 'line' (Title: 'LỘ TRÌNH DỰ BÁO', Labels: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'], Datasets: [{ 'label': 'Tiến độ %', 'data': [%d, %d, %d, 100] }])\n\n", (int) Math.min(completionRate, 30), (int) Math.min(completionRate + 25, 60), (int) Math.min(completionRate + 50, 85)));
+
+        promptSb.append("Mẫu định dạng JSON mỗi phần tử:\n");
+        promptSb.append("{\n");
+        promptSb.append("  \"title\": \"Tiêu đề mục\",\n");
+        promptSb.append("  \"content\": \"Đoạn văn phân tích chuyên sâu 4-6 câu viết trên một dòng không dùng ngoặc kép\",\n");
+        promptSb.append("  \"chart\": {\n");
+        promptSb.append("    \"title\": \"Tên biểu đồ\",\n");
+        promptSb.append("    \"chartType\": \"doughnut\" | \"bar\" | \"radar\" | \"stackedBar\" | \"line\",\n");
+        promptSb.append("    \"labels\": [\"Nhãn 1\", \"Nhãn 2\"],\n");
+        promptSb.append("    \"datasets\": [{ \"label\": \"Số lượng\", \"data\": [10, 20] }],\n");
+        promptSb.append("    \"insight\": \"Nhận xét chiến lược ngắn gọn viết trên một dòng\"\n");
+        promptSb.append("  }\n");
+        promptSb.append("}");
+
+        return openRouterServiceClient.generateContent(promptSb.toString());
+    }
     }
 
     public List<AiSearchResultDto> smartSearchTasks(String projectId, String query) {

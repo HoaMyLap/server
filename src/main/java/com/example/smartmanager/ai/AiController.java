@@ -1,6 +1,7 @@
 package com.example.smartmanager.ai;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +10,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
+@Slf4j
 public class AiController {
 
     private final AiService aiService;
@@ -20,7 +22,8 @@ public class AiController {
             String summary = aiService.generateDailyProjectSummary(projectId);
             return ResponseEntity.ok(Map.of("summary", summary));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            log.error("Lỗi khi sinh Báo cáo AI cho dự án {}: ", projectId, e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Lỗi sinh báo cáo AI"));
         }
     }
 

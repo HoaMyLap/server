@@ -148,7 +148,6 @@ public class AiService {
 
         return openRouterServiceClient.generateContent(promptSb.toString());
     }
-    }
 
     public List<AiSearchResultDto> smartSearchTasks(String projectId, String query) {
         if (query == null || query.trim().isEmpty()) {

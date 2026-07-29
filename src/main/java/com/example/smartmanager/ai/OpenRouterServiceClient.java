@@ -117,7 +117,7 @@ public class OpenRouterServiceClient {
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("model", model);
                 requestBody.put("messages", Collections.singletonList(message));
-                requestBody.put("max_tokens", 450);
+                requestBody.put("max_tokens", 2500);
 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);

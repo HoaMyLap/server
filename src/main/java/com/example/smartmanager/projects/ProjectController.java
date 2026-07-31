@@ -74,4 +74,32 @@ public class ProjectController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/{id}/files")
+    public ResponseEntity<List<ProjectFileEntity>> getProjectFiles(@PathVariable("id") String projectId) {
+        return ResponseEntity.ok(projectService.getProjectFiles(projectId));
+    }
+
+    @PostMapping("/{id}/files")
+    public ResponseEntity<?> addProjectFile(
+            @PathVariable("id") String projectId,
+            @RequestBody ProjectFileEntity file,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            ProjectFileEntity saved = projectService.saveProjectFile(projectId, file, userPrincipal != null ? userPrincipal.getId() : null);
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}/files/{fileId}")
+    public ResponseEntity<?> deleteProjectFile(@PathVariable("id") String projectId, @PathVariable("fileId") String fileId) {
+        try {
+            projectService.deleteProjectFile(fileId);
+            return ResponseEntity.ok(Map.of("message", "Xóa tệp tin thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

@@ -181,4 +181,32 @@ public class TaskController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/{id}/files")
+    public ResponseEntity<List<TaskFileEntity>> getTaskFiles(@PathVariable("id") String taskId) {
+        return ResponseEntity.ok(taskService.getTaskFiles(taskId));
+    }
+
+    @PostMapping("/{id}/files")
+    public ResponseEntity<?> addTaskFile(
+            @PathVariable("id") String taskId,
+            @RequestBody TaskFileEntity file,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            TaskFileEntity saved = taskService.saveTaskFile(taskId, file, userPrincipal != null ? userPrincipal.getId() : null);
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}/files/{fileId}")
+    public ResponseEntity<?> deleteTaskFile(@PathVariable("id") String taskId, @PathVariable("fileId") String fileId) {
+        try {
+            taskService.deleteTaskFile(fileId);
+            return ResponseEntity.ok(Map.of("message", "Xóa tệp tin thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

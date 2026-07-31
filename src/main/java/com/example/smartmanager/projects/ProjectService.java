@@ -64,6 +64,27 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    private final ProjectFileRepository projectFileRepository;
+
+    public List<ProjectFileEntity> getProjectFiles(String projectId) {
+        return projectFileRepository.findByProjectIdOrderByUploadedAtDesc(UUID.fromString(projectId));
+    }
+
+    @Transactional
+    public ProjectFileEntity saveProjectFile(String projectId, ProjectFileEntity file, String uploaderId) {
+        file.setProjectId(UUID.fromString(projectId));
+        if (uploaderId != null) {
+            file.setUploaderId(UUID.fromString(uploaderId));
+        }
+        file.setUploadedAt(LocalDateTime.now());
+        return projectFileRepository.save(file);
+    }
+
+    @Transactional
+    public void deleteProjectFile(String fileId) {
+        projectFileRepository.deleteById(UUID.fromString(fileId));
+    }
+
     @Transactional
     public void deleteProject(String projectId) {
         ProjectEntity project = getProjectById(projectId);

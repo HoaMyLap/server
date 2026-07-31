@@ -370,4 +370,25 @@ public class TaskService {
         }
         return createdList;
     }
+
+    private final TaskFileRepository taskFileRepository;
+
+    public List<TaskFileEntity> getTaskFiles(String taskId) {
+        return taskFileRepository.findByTaskIdOrderByUploadedAtDesc(UUID.fromString(taskId));
+    }
+
+    @Transactional
+    public TaskFileEntity saveTaskFile(String taskId, TaskFileEntity file, String uploaderId) {
+        file.setTaskId(UUID.fromString(taskId));
+        if (uploaderId != null) {
+            file.setUploaderId(UUID.fromString(uploaderId));
+        }
+        file.setUploadedAt(LocalDateTime.now());
+        return taskFileRepository.save(file);
+    }
+
+    @Transactional
+    public void deleteTaskFile(String fileId) {
+        taskFileRepository.deleteById(UUID.fromString(fileId));
+    }
 }

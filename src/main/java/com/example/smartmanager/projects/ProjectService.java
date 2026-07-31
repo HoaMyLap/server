@@ -1,6 +1,8 @@
 package com.example.smartmanager.projects;
 
 import com.example.smartmanager.workspaces.WorkspaceMemberRepository;
+import com.example.smartmanager.workspaces.WorkspaceMemberDto;
+import com.example.smartmanager.workspaces.WorkspaceMemberEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +25,18 @@ public class ProjectService {
         project.setUpdatedAt(LocalDateTime.now());
         ProjectEntity saved = projectRepository.save(project);
 
-        // Thêm người tạo vào project_members
+        // Thêm tất cả các thành viên hiện tại của Workspace vào dự án mới này
+        try {
+            List<WorkspaceMemberEntity> wsMembers = workspaceMemberRepository.findByIdWorkspaceId(saved.getWorkspaceId());
+            for (WorkspaceMemberEntity wm : wsMembers) {
+                ProjectMemberId pmId = new ProjectMemberId(saved.getId(), wm.getId().getUserId());
+                projectMemberRepository.save(new ProjectMemberEntity(pmId, wm.getRole(), LocalDateTime.now()));
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to populate members for new project: " + e.getMessage());
+        }
+
+        // Đảm bảo người tạo dự án có vai trò ADMIN
         if (userId != null) {
             ProjectMemberId pmId = new ProjectMemberId(saved.getId(), UUID.fromString(userId));
             projectMemberRepository.save(new ProjectMemberEntity(pmId, "ADMIN", LocalDateTime.now()));
@@ -36,15 +49,13 @@ public class ProjectService {
         UUID wsUuid = UUID.fromString(workspaceId);
         UUID userUuid = UUID.fromString(userId);
 
-        // Kiểm tra xem user có phải Admin của Workspace không
+        // Bất kỳ ai là thành viên của Workspace đều thấy và tham gia tất cả các dự án trong workspace đó
         Optional<String> roleOpt = workspaceMemberRepository.findRoleByWorkspaceIdAndUserId(wsUuid, userUuid);
-        if (roleOpt.isPresent() && "ADMIN".equalsIgnoreCase(roleOpt.get())) {
-            // Workspace Admin xem được tất cả các dự án trong workspace
+        if (roleOpt.isPresent()) {
             return projectRepository.findByWorkspaceId(wsUuid);
         }
 
-        // Người dùng thông thường chỉ xem được các dự án mà họ thuộc danh sách project_members
-        return projectMemberRepository.findUserProjectsInWorkspace(wsUuid, userUuid);
+        return java.util.Collections.emptyList();
     }
 
     public ProjectEntity getProjectById(String projectId) {
@@ -89,5 +100,9 @@ public class ProjectService {
     public void deleteProject(String projectId) {
         ProjectEntity project = getProjectById(projectId);
         projectRepository.delete(project);
+    }
+
+    public List<WorkspaceMemberDto> getProjectMembers(String projectId) {
+        return projectMemberRepository.findProjectMembersWithDetails(UUID.fromString(projectId));
     }
 }

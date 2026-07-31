@@ -205,6 +205,23 @@ public class NotificationService {
                 // Thêm vào project_members cho riêng dự án được mời
                 ProjectMemberId pmId = new ProjectMemberId(invitation.getTargetId(), user.getId());
                 projectMemberRepository.save(new ProjectMemberEntity(pmId, invitation.getRole(), LocalDateTime.now()));
+
+                // Phát tín nhắn realtime cho dự án qua WebSocket
+                try {
+                    java.util.Map<String, Object> socketMsg = new java.util.HashMap<>();
+                    socketMsg.put("action", "ADD_MEMBER");
+                    socketMsg.put("projectId", invitation.getTargetId().toString());
+                    java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                    payload.put("userId", user.getId().toString());
+                    payload.put("email", user.getEmail());
+                    payload.put("fullname", user.getFullname());
+                    payload.put("avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "");
+                    payload.put("role", invitation.getRole());
+                    socketMsg.put("payload", payload);
+                    messagingTemplate.convertAndSend("/topic/projects/" + invitation.getTargetId().toString(), socketMsg);
+                } catch (Exception e) {
+                    System.err.println("Failed to broadcast project member add: " + e.getMessage());
+                }
             } else {
                 // Thêm vào Workspace Member với vai trò được mời
                 WorkspaceMemberId memberId = new WorkspaceMemberId(workspaceIdToJoin, user.getId());
@@ -215,6 +232,34 @@ public class NotificationService {
                 for (ProjectEntity p : allProjects) {
                     ProjectMemberId pmId = new ProjectMemberId(p.getId(), user.getId());
                     projectMemberRepository.save(new ProjectMemberEntity(pmId, invitation.getRole(), LocalDateTime.now()));
+                }
+
+                // Phát tín nhắn realtime cho Workspace và toàn bộ các Dự án con
+                try {
+                    java.util.Map<String, Object> socketMsg = new java.util.HashMap<>();
+                    socketMsg.put("action", "ADD_MEMBER");
+                    socketMsg.put("workspaceId", workspaceIdToJoin.toString());
+                    java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                    payload.put("userId", user.getId().toString());
+                    payload.put("email", user.getEmail());
+                    payload.put("fullname", user.getFullname());
+                    payload.put("avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "");
+                    payload.put("role", invitation.getRole());
+                    socketMsg.put("payload", payload);
+
+                    // Gửi đến workspace topic
+                    messagingTemplate.convertAndSend("/topic/workspaces/" + workspaceIdToJoin.toString(), socketMsg);
+
+                    // Gửi đến từng dự án trong workspace
+                    for (ProjectEntity p : allProjects) {
+                        java.util.Map<String, Object> pSocketMsg = new java.util.HashMap<>();
+                        pSocketMsg.put("action", "ADD_MEMBER");
+                        pSocketMsg.put("projectId", p.getId().toString());
+                        pSocketMsg.put("payload", payload);
+                        messagingTemplate.convertAndSend("/topic/projects/" + p.getId().toString(), pSocketMsg);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to broadcast workspace/project member add: " + e.getMessage());
                 }
             }
 

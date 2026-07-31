@@ -105,4 +105,10 @@ public class ProjectController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/{projectId}/members")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
+    public ResponseEntity<List<com.example.smartmanager.workspaces.WorkspaceMemberDto>> getProjectMembers(@PathVariable("projectId") String projectId) {
+        return ResponseEntity.ok(projectService.getProjectMembers(projectId));
+    }
 }

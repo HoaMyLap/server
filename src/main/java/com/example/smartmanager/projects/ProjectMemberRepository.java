@@ -13,4 +13,10 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMemberEnti
 
     @Query("SELECT p FROM ProjectEntity p WHERE p.workspaceId = :workspaceId AND p.id IN (SELECT pm.id.projectId FROM ProjectMemberEntity pm WHERE pm.id.userId = :userId)")
     List<ProjectEntity> findUserProjectsInWorkspace(@Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId);
+
+    @Query("SELECT new com.example.smartmanager.workspaces.WorkspaceMemberDto(u.id, u.email, u.fullname, u.avatarUrl, pm.role) " +
+           "FROM ProjectMemberEntity pm " +
+           "JOIN com.example.smartmanager.users.UserEntity u ON pm.id.userId = u.id " +
+           "WHERE pm.id.projectId = :projectId")
+    List<com.example.smartmanager.workspaces.WorkspaceMemberDto> findProjectMembersWithDetails(@Param("projectId") UUID projectId);
 }

@@ -71,14 +71,42 @@ public class SecurityService {
                 return false;
             }
 
-            if (hasWorkspaceRole(projectOpt.get().getWorkspaceId().toString(), requiredRole)) {
-                return true;
-            }
-
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal userPrincipal) {
                 UUID userId = UUID.fromString(userPrincipal.getId());
-                return projectMemberRepository.existsByIdProjectIdAndIdUserId(projId, userId);
+
+                // 1. Kiểm tra vai trò trong Workspace
+                Optional<String> wsRoleOpt = workspaceMemberRepository.findRoleByWorkspaceIdAndUserId(
+                        projectOpt.get().getWorkspaceId(),
+                        userId
+                );
+                if (wsRoleOpt.isPresent()) {
+                    String wsRole = wsRoleOpt.get();
+                    if ("ADMIN".equals(wsRole)) {
+                        return true; // Workspace Admin có tất cả các quyền
+                    }
+                    if ("MEMBER".equals(wsRole)) {
+                        // Quyền MEMBER được thừa kế xem và làm việc, ngoại trừ quyền ADMIN dự án
+                        if (!"ADMIN".equals(requiredRole)) {
+                            return true;
+                        }
+                    }
+                }
+
+                // 2. Kiểm tra vai trò trực tiếp trong Project Member
+                Optional<com.example.smartmanager.projects.ProjectMemberEntity> pmOpt = projectMemberRepository.findById(
+                        new com.example.smartmanager.projects.ProjectMemberId(projId, userId)
+                );
+                if (pmOpt.isPresent()) {
+                    String pmRole = pmOpt.get().getRole();
+                    if ("ADMIN".equals(pmRole)) {
+                        return true;
+                    }
+                    if ("MEMBER".equals(pmRole)) {
+                        return "MEMBER".equals(requiredRole) || "VIEWER".equals(requiredRole);
+                    }
+                    return "VIEWER".equals(requiredRole);
+                }
             }
             return false;
         } catch (Exception e) {

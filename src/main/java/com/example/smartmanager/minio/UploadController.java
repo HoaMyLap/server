@@ -1,4 +1,4 @@
-package com.example.smartmanager.cloudinary;
+package com.example.smartmanager.minio;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,12 +12,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UploadController {
 
-    private final CloudinaryService cloudinaryService;
+    private final MinioService minioService;
 
     @PostMapping("/image")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
-            String imageUrl = cloudinaryService.uploadImage(file);
+            String imageUrl = minioService.uploadImage(file);
             return ResponseEntity.ok(Map.of("url", imageUrl));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -27,7 +27,7 @@ public class UploadController {
     @PostMapping("/file")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
-            String fileUrl = cloudinaryService.uploadFile(file);
+            String fileUrl = minioService.uploadFile(file);
             return ResponseEntity.ok(Map.of(
                 "url", fileUrl,
                 "name", file.getOriginalFilename() != null ? file.getOriginalFilename() : "document",

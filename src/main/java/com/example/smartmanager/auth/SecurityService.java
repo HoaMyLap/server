@@ -2,6 +2,7 @@ package com.example.smartmanager.auth;
 
 import com.example.smartmanager.workspaces.WorkspaceMemberRepository;
 import com.example.smartmanager.projects.ProjectRepository;
+import com.example.smartmanager.projects.ProjectMemberRepository;
 import com.example.smartmanager.projects.ProjectEntity;
 import com.example.smartmanager.tasks.TaskRepository;
 import com.example.smartmanager.tasks.TaskEntity;
@@ -18,6 +19,7 @@ public class SecurityService {
 
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final TaskRepository taskRepository;
 
     /**
@@ -59,7 +61,7 @@ public class SecurityService {
     }
 
     /**
-     * Kiểm tra xem người dùng hiện tại có vai trò trong Workspace chứa Project hay không.
+     * Kiểm tra xem người dùng hiện tại có vai trò trong Workspace chứa Project hoặc thuộc Project Member hay không.
      */
     public boolean hasProjectRole(String projectId, String requiredRole) {
         try {
@@ -68,7 +70,17 @@ public class SecurityService {
             if (projectOpt.isEmpty()) {
                 return false;
             }
-            return hasWorkspaceRole(projectOpt.get().getWorkspaceId().toString(), requiredRole);
+
+            if (hasWorkspaceRole(projectOpt.get().getWorkspaceId().toString(), requiredRole)) {
+                return true;
+            }
+
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal userPrincipal) {
+                UUID userId = UUID.fromString(userPrincipal.getId());
+                return projectMemberRepository.existsByIdProjectIdAndIdUserId(projId, userId);
+            }
+            return false;
         } catch (Exception e) {
             return false;
         }

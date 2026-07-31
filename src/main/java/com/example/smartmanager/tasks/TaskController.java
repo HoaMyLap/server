@@ -162,17 +162,17 @@ public class TaskController {
         }
     }
 
-    @GetMapping("/{id}/logs")
+    @GetMapping("/{taskId}/logs")
     @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
-    public ResponseEntity<List<TaskLogEntity>> getTaskLogs(@PathVariable("id") String taskId) {
+    public ResponseEntity<List<TaskLogEntity>> getTaskLogs(@PathVariable("taskId") String taskId) {
         List<TaskLogEntity> logs = taskService.getTaskLogs(taskId);
         return ResponseEntity.ok(logs);
     }
 
-    @PatchMapping("/{id}/toggle-done")
+    @PatchMapping("/{taskId}/toggle-done")
     @PreAuthorize("@securityService.hasTaskRole(#taskId, 'MEMBER')")
     public ResponseEntity<?> toggleSubtaskDone(
-            @PathVariable("id") String taskId,
+            @PathVariable("taskId") String taskId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         try {
             TaskEntity updated = taskService.toggleTaskDone(taskId, userPrincipal.getId());
@@ -182,14 +182,16 @@ public class TaskController {
         }
     }
 
-    @GetMapping("/{id}/files")
-    public ResponseEntity<List<TaskFileEntity>> getTaskFiles(@PathVariable("id") String taskId) {
+    @GetMapping("/{taskId}/files")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
+    public ResponseEntity<List<TaskFileEntity>> getTaskFiles(@PathVariable("taskId") String taskId) {
         return ResponseEntity.ok(taskService.getTaskFiles(taskId));
     }
 
-    @PostMapping("/{id}/files")
+    @PostMapping("/{taskId}/files")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
     public ResponseEntity<?> addTaskFile(
-            @PathVariable("id") String taskId,
+            @PathVariable("taskId") String taskId,
             @RequestBody TaskFileEntity file,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         try {
@@ -200,8 +202,9 @@ public class TaskController {
         }
     }
 
-    @DeleteMapping("/{id}/files/{fileId}")
-    public ResponseEntity<?> deleteTaskFile(@PathVariable("id") String taskId, @PathVariable("fileId") String fileId) {
+    @DeleteMapping("/{taskId}/files/{fileId}")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
+    public ResponseEntity<?> deleteTaskFile(@PathVariable("taskId") String taskId, @PathVariable("fileId") String fileId) {
         try {
             taskService.deleteTaskFile(fileId);
             return ResponseEntity.ok(Map.of("message", "Xóa tệp tin thành công"));

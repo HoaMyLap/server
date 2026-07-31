@@ -39,9 +39,9 @@ public class ProjectController {
         return ResponseEntity.ok(projects);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{projectId}")
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
-    public ResponseEntity<?> getProjectById(@PathVariable("id") String projectId) {
+    public ResponseEntity<?> getProjectById(@PathVariable("projectId") String projectId) {
         try {
             ProjectEntity project = projectService.getProjectById(projectId);
             return ResponseEntity.ok(project);
@@ -50,10 +50,10 @@ public class ProjectController {
         }
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{projectId}")
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'MEMBER')")
     public ResponseEntity<?> updateProject(
-            @PathVariable("id") String projectId,
+            @PathVariable("projectId") String projectId,
             @Valid @RequestBody ProjectEntity project) {
         try {
             project.setId(java.util.UUID.fromString(projectId));
@@ -64,9 +64,9 @@ public class ProjectController {
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{projectId}")
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'ADMIN')")
-    public ResponseEntity<?> deleteProject(@PathVariable("id") String projectId) {
+    public ResponseEntity<?> deleteProject(@PathVariable("projectId") String projectId) {
         try {
             projectService.deleteProject(projectId);
             return ResponseEntity.ok(Map.of("message", "Xóa dự án thành công"));
@@ -75,14 +75,16 @@ public class ProjectController {
         }
     }
 
-    @GetMapping("/{id}/files")
-    public ResponseEntity<List<ProjectFileEntity>> getProjectFiles(@PathVariable("id") String projectId) {
+    @GetMapping("/{projectId}/files")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
+    public ResponseEntity<List<ProjectFileEntity>> getProjectFiles(@PathVariable("projectId") String projectId) {
         return ResponseEntity.ok(projectService.getProjectFiles(projectId));
     }
 
-    @PostMapping("/{id}/files")
+    @PostMapping("/{projectId}/files")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
     public ResponseEntity<?> addProjectFile(
-            @PathVariable("id") String projectId,
+            @PathVariable("projectId") String projectId,
             @RequestBody ProjectFileEntity file,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         try {
@@ -93,8 +95,9 @@ public class ProjectController {
         }
     }
 
-    @DeleteMapping("/{id}/files/{fileId}")
-    public ResponseEntity<?> deleteProjectFile(@PathVariable("id") String projectId, @PathVariable("fileId") String fileId) {
+    @DeleteMapping("/{projectId}/files/{fileId}")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
+    public ResponseEntity<?> deleteProjectFile(@PathVariable("projectId") String projectId, @PathVariable("fileId") String fileId) {
         try {
             projectService.deleteProjectFile(fileId);
             return ResponseEntity.ok(Map.of("message", "Xóa tệp tin thành công"));

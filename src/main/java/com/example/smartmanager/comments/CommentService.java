@@ -6,16 +6,18 @@ import com.example.smartmanager.tasks.TaskLogRepository;
 import com.example.smartmanager.tasks.TaskRepository;
 import com.example.smartmanager.tasks.TaskMessage;
 import com.example.smartmanager.notifications.NotificationService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
-@RequiredArgsConstructor
 public class CommentService {
 
     private final CommentRepository commentRepository;
@@ -23,6 +25,38 @@ public class CommentService {
     private final TaskRepository taskRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    public CommentService(
+            CommentRepository commentRepository,
+            TaskLogRepository taskLogRepository,
+            TaskRepository taskRepository,
+            SimpMessagingTemplate messagingTemplate,
+            NotificationService notificationService,
+            @Qualifier("redisTemplate") RedisTemplate<String, Object> redisTemplate) {
+        this.commentRepository = commentRepository;
+        this.taskLogRepository = taskLogRepository;
+        this.taskRepository = taskRepository;
+        this.messagingTemplate = messagingTemplate;
+        this.notificationService = notificationService;
+        this.redisTemplate = redisTemplate;
+    }
+
+    public void setViewingDiscussion(String taskId, String userId, boolean viewing) {
+        String key = "task:viewers:" + taskId;
+        if (viewing) {
+            redisTemplate.opsForSet().add(key, userId);
+            redisTemplate.expire(key, 15, TimeUnit.SECONDS);
+        } else {
+            redisTemplate.opsForSet().remove(key, userId);
+        }
+    }
+
+    public boolean isUserViewingDiscussion(String taskId, String userId) {
+        String key = "task:viewers:" + taskId;
+        Boolean isMember = redisTemplate.opsForSet().isMember(key, userId);
+        return Boolean.TRUE.equals(isMember);
+    }
 
     @Transactional
     public CommentEntity createComment(CommentEntity comment, String userId) {
@@ -47,25 +81,59 @@ public class CommentService {
         );
         taskLogRepository.save(log);
 
-        // Tạo thông báo cho người được giao (Assignee) nếu không phải là người viết bình luận
-        if (task.getAssigneeId() != null && !task.getAssigneeId().toString().equals(userId)) {
-            notificationService.createNotification(
-                    task.getAssigneeId().toString(),
-                    "Bình luận mới trong công việc của bạn",
-                    "Thành viên khác vừa bình luận vào công việc \"" + task.getTitle() + "\"",
-                    "COMMENT"
-            );
-        }
+        // Gửi thông báo đến những người nhận (loại trừ chính người viết bình luận và những người đang mở tab thảo luận)
+        try {
+            java.util.Set<UUID> recipients = new java.util.HashSet<>();
+            
+            // 1. Assignee
+            if (task.getAssigneeId() != null) {
+                recipients.add(task.getAssigneeId());
+            }
+            // 2. Creator
+            if (task.getCreatorId() != null) {
+                recipients.add(task.getCreatorId());
+            }
+            // 3. Parent comment author (nếu là câu trả lời)
+            if (saved.getParentCommentId() != null) {
+                commentRepository.findById(saved.getParentCommentId()).ifPresent(parent -> {
+                    if (parent.getUserId() != null) {
+                        recipients.add(parent.getUserId());
+                    }
+                });
+            }
+            // 4. Các thành viên đã từng bình luận trước đó
+            List<CommentEntity> previousComments = commentRepository.findByTaskIdOrderByCreatedAtAsc(saved.getTaskId());
+            for (CommentEntity c : previousComments) {
+                if (c.getUserId() != null) {
+                    recipients.add(c.getUserId());
+                }
+            }
 
-        // Tạo thông báo cho người tạo công việc (Creator) nếu họ không phải là người viết bình luận và không phải là người được giao
-        if (task.getCreatorId() != null && !task.getCreatorId().toString().equals(userId) && 
-            (task.getAssigneeId() == null || !task.getAssigneeId().equals(task.getCreatorId()))) {
-            notificationService.createNotification(
-                    task.getCreatorId().toString(),
-                    "Bình luận mới trong công việc bạn tạo",
-                    "Thành viên khác vừa bình luận vào công việc \"" + task.getTitle() + "\"",
-                    "COMMENT"
-            );
+            for (UUID rId : recipients) {
+                if (!rId.toString().equals(userId)) {
+                    if (!isUserViewingDiscussion(task.getId().toString(), rId.toString())) {
+                        String title = "Thảo luận mới trong công việc";
+                        String content = "Có phản hồi mới trong cuộc thảo luận công việc \"" + task.getTitle() + "\"";
+                        
+                        if (rId.equals(task.getAssigneeId())) {
+                            title = "Bình luận mới trong công việc của bạn";
+                            content = "Thành viên khác vừa bình luận vào công việc \"" + task.getTitle() + "\"";
+                        } else if (rId.equals(task.getCreatorId())) {
+                            title = "Bình luận mới trong công việc bạn tạo";
+                            content = "Thành viên khác vừa bình luận vào công việc \"" + task.getTitle() + "\"";
+                        }
+
+                        notificationService.createNotification(
+                                rId.toString(),
+                                title,
+                                content,
+                                "COMMENT"
+                        );
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to send comment notifications: " + e.getMessage());
         }
 
         // Phát tin nhắn realtime qua WebSocket
@@ -143,6 +211,7 @@ public class CommentService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bình luận"));
 
         UUID userUuid = UUID.fromString(userId);
+        boolean isLikedNow = !comment.getLikedUserIds().contains(userUuid);
         if (comment.getLikedUserIds().contains(userUuid)) {
             comment.getLikedUserIds().remove(userUuid);
         } else {
@@ -153,6 +222,18 @@ public class CommentService {
 
         TaskEntity task = taskRepository.findById(saved.getTaskId()).orElse(null);
         if (task != null) {
+            // Gửi thông báo cho tác giả nếu được thích và họ không đang xem thảo luận
+            if (isLikedNow && saved.getUserId() != null && !saved.getUserId().toString().equals(userId)) {
+                if (!isUserViewingDiscussion(task.getId().toString(), saved.getUserId().toString())) {
+                    notificationService.createNotification(
+                            saved.getUserId().toString(),
+                            "Bình luận của bạn được thích",
+                            "Thành viên khác vừa thích bình luận của bạn trong công việc \"" + task.getTitle() + "\"",
+                            "COMMENT"
+                    );
+                }
+            }
+
             TaskMessage message = new TaskMessage(
                     "LIKE_COMMENT",
                     saved.getTaskId().toString(),

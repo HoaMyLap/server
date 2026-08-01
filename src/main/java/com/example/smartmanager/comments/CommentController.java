@@ -74,4 +74,18 @@ public class CommentController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PostMapping("/task/{taskId}/viewing")
+    @PreAuthorize("@securityService.hasTaskRole(#taskId, 'VIEWER')")
+    public ResponseEntity<?> setViewingDiscussion(
+            @PathVariable("taskId") String taskId,
+            @RequestParam("viewing") boolean viewing,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            commentService.setViewingDiscussion(taskId, userPrincipal.getId(), viewing);
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

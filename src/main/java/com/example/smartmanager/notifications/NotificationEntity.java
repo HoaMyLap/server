@@ -36,6 +36,15 @@ public class NotificationEntity {
     @Column(name = "invitation_id")
     private UUID invitationId;
 
+    @Column(name = "project_id")
+    private UUID projectId;
+
+    @Column(name = "task_id")
+    private UUID taskId;
+
+    @Column(name = "comment_id")
+    private UUID commentId;
+
     @Transient
     private String invitationStatus;
 

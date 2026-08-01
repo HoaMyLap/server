@@ -123,11 +123,15 @@ public class CommentService {
                             content = "Thành viên khác vừa bình luận vào công việc \"" + task.getTitle() + "\"";
                         }
 
-                        notificationService.createNotification(
+                        notificationService.createNotificationWithNav(
                                 rId.toString(),
                                 title,
                                 content,
-                                "COMMENT"
+                                "COMMENT",
+                                null,
+                                task.getProjectId(),
+                                task.getId(),
+                                saved.getId()
                         );
                     }
                 }
@@ -225,11 +229,15 @@ public class CommentService {
             // Gửi thông báo cho tác giả nếu được thích và họ không đang xem thảo luận
             if (isLikedNow && saved.getUserId() != null && !saved.getUserId().toString().equals(userId)) {
                 if (!isUserViewingDiscussion(task.getId().toString(), saved.getUserId().toString())) {
-                    notificationService.createNotification(
+                    notificationService.createNotificationWithNav(
                             saved.getUserId().toString(),
                             "Bình luận của bạn được thích",
                             "Thành viên khác vừa thích bình luận của bạn trong công việc \"" + task.getTitle() + "\"",
-                            "COMMENT"
+                            "COMMENT",
+                            null,
+                            task.getProjectId(),
+                            task.getId(),
+                            saved.getId()
                     );
                 }
             }

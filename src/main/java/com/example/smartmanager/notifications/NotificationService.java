@@ -68,11 +68,16 @@ public class NotificationService {
 
     @Transactional
     public NotificationEntity createNotification(String userId, String title, String content, String type) {
-        return createNotificationWithInvitation(userId, title, content, type, null);
+        return createNotificationWithNav(userId, title, content, type, null, null, null, null);
     }
 
     @Transactional
     public NotificationEntity createNotificationWithInvitation(String userId, String title, String content, String type, UUID invitationId) {
+        return createNotificationWithNav(userId, title, content, type, invitationId, null, null, null);
+    }
+
+    @Transactional
+    public NotificationEntity createNotificationWithNav(String userId, String title, String content, String type, UUID invitationId, UUID projectId, UUID taskId, UUID commentId) {
         NotificationEntity notification = new NotificationEntity();
         notification.setUserId(UUID.fromString(userId));
         notification.setTitle(title);
@@ -80,6 +85,9 @@ public class NotificationService {
         notification.setIsRead(false);
         notification.setType(type);
         notification.setInvitationId(invitationId);
+        notification.setProjectId(projectId);
+        notification.setTaskId(taskId);
+        notification.setCommentId(commentId);
         notification.setCreatedAt(LocalDateTime.now());
 
         NotificationEntity saved = notificationRepository.save(notification);

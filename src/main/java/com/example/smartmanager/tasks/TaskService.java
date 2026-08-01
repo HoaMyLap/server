@@ -55,11 +55,15 @@ public class TaskService {
 
         // Tạo thông báo nếu giao cho ai đó
         if (saved.getAssigneeId() != null && (creatorId == null || !creatorId.equals(saved.getAssigneeId().toString()))) {
-            notificationService.createNotification(
+            notificationService.createNotificationWithNav(
                     saved.getAssigneeId().toString(),
                     "Bạn được giao công việc mới",
                     "Bạn đã được giao công việc: \"" + saved.getTitle() + "\"",
-                    "ASSIGNMENT"
+                    "ASSIGNMENT",
+                    null,
+                    saved.getProjectId(),
+                    saved.getId(),
+                    null
             );
         }
 
@@ -159,11 +163,15 @@ public class TaskService {
 
             // Gửi thông báo cho người thực hiện nếu họ không phải là người di chuyển
             if (saved.getAssigneeId() != null && (userId == null || !userId.equals(saved.getAssigneeId().toString()))) {
-                notificationService.createNotification(
+                notificationService.createNotificationWithNav(
                         saved.getAssigneeId().toString(),
                         "Công việc của bạn đã thay đổi trạng thái",
                         "Công việc \"" + saved.getTitle() + "\" được chuyển sang cột: " + newStatus,
-                        "ASSIGNMENT"
+                        "ASSIGNMENT",
+                        null,
+                        saved.getProjectId(),
+                        saved.getId(),
+                        null
                 );
             }
         }
@@ -210,11 +218,15 @@ public class TaskService {
         // Thông báo cho người được phân công mới
         if (saved.getAssigneeId() != null && !saved.getAssigneeId().equals(oldAssignee) && 
             (userId == null || !userId.equals(saved.getAssigneeId().toString()))) {
-            notificationService.createNotification(
+            notificationService.createNotificationWithNav(
                     saved.getAssigneeId().toString(),
                     "Bạn được phân công công việc mới",
                     "Bạn được phân công quản trị công việc: \"" + saved.getTitle() + "\"",
-                    "ASSIGNMENT"
+                    "ASSIGNMENT",
+                    null,
+                    saved.getProjectId(),
+                    saved.getId(),
+                    null
             );
         }
 

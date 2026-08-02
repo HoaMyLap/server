@@ -10,8 +10,21 @@ import java.time.LocalDateTime;
 @Table(name = "workspace_members")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class WorkspaceMemberEntity {
+
+    public WorkspaceMemberEntity(WorkspaceMemberId id, String role, LocalDateTime createdAt) {
+        this.id = id;
+        this.role = role;
+        this.createdAt = createdAt;
+        this.roleId = null;
+    }
+
+    public WorkspaceMemberEntity(WorkspaceMemberId id, String role, java.util.UUID roleId, LocalDateTime createdAt) {
+        this.id = id;
+        this.role = role;
+        this.roleId = roleId;
+        this.createdAt = createdAt;
+    }
 
     @EmbeddedId
     private WorkspaceMemberId id;

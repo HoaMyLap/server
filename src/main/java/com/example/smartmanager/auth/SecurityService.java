@@ -125,34 +125,49 @@ public class SecurityService {
                 UUID userId = UUID.fromString(userPrincipal.getId());
                 UUID wsId = projectOpt.get().getWorkspaceId();
 
-                // 1. Check workspace level permissions override/inheritance
-                if ("ADMIN".equals(requiredRole)) {
-                    if (hasPermission(wsId, userId, "PROJECT_DELETE") || hasPermission(wsId, userId, "WORKSPACE_ROLE_MANAGE")) {
-                        return true;
-                    }
-                } else if ("MEMBER".equals(requiredRole)) {
-                    if (hasPermission(wsId, userId, "TASK_CREATE") || hasPermission(wsId, userId, "TASK_UPDATE")) {
-                        return true;
-                    }
-                } else { // VIEWER
-                    if (hasPermission(wsId, userId, "PROJECT_VIEW")) {
-                        return true;
-                    }
+                // 1. If Workspace Admin -> always allow full permissions
+                Optional<WorkspaceMemberEntity> wsMemberOpt = workspaceMemberRepository.findById(
+                        new WorkspaceMemberId(wsId, userId)
+                );
+                if (wsMemberOpt.isPresent() && "ADMIN".equals(wsMemberOpt.get().getRole())) {
+                    return true;
                 }
 
-                // 2. Check project members level
+                // 2. Check project members level first (more specific than workspace generic role)
                 Optional<com.example.smartmanager.projects.ProjectMemberEntity> pmOpt = projectMemberRepository.findById(
                         new com.example.smartmanager.projects.ProjectMemberId(projId, userId)
                 );
                 if (pmOpt.isPresent()) {
                     String pmRole = pmOpt.get().getRole();
+                    
+                    // If workspace permission doesn't allow viewing, they are blocked entirely
+                    if (!hasPermission(wsId, userId, "PROJECT_VIEW")) {
+                        return false;
+                    }
+                    
                     if ("ADMIN".equals(pmRole)) {
-                        return true;
+                        if ("ADMIN".equals(requiredRole)) {
+                            return hasPermission(wsId, userId, "PROJECT_DELETE") || hasPermission(wsId, userId, "WORKSPACE_ROLE_MANAGE");
+                        }
+                        return hasPermission(wsId, userId, "TASK_UPDATE") || hasPermission(wsId, userId, "TASK_CREATE") || "VIEWER".equals(requiredRole);
                     }
                     if ("MEMBER".equals(pmRole)) {
-                        return "MEMBER".equals(requiredRole) || "VIEWER".equals(requiredRole);
+                        if ("MEMBER".equals(requiredRole)) {
+                            return hasPermission(wsId, userId, "TASK_UPDATE") || hasPermission(wsId, userId, "TASK_CREATE");
+                        }
+                        return "VIEWER".equals(requiredRole);
                     }
+                    // pmRole is VIEWER
                     return "VIEWER".equals(requiredRole);
+                }
+
+                // 3. Fallback to workspace level permissions if not specifically in the project members list
+                if ("ADMIN".equals(requiredRole)) {
+                    return hasPermission(wsId, userId, "PROJECT_DELETE") || hasPermission(wsId, userId, "WORKSPACE_ROLE_MANAGE");
+                } else if ("MEMBER".equals(requiredRole)) {
+                    return hasPermission(wsId, userId, "TASK_CREATE") || hasPermission(wsId, userId, "TASK_UPDATE");
+                } else { // VIEWER
+                    return hasPermission(wsId, userId, "PROJECT_VIEW");
                 }
             }
             return false;

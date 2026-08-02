@@ -230,6 +230,23 @@ public class NotificationService {
                 } catch (Exception e) {
                     System.err.println("Failed to broadcast project member add: " + e.getMessage());
                 }
+
+                // Gửi thông báo đến tất cả thành viên khác trong Dự án
+                try {
+                    List<ProjectMemberEntity> pMembers = projectMemberRepository.findByIdProjectId(invitation.getTargetId());
+                    for (ProjectMemberEntity pm : pMembers) {
+                        if (!pm.getId().getUserId().equals(user.getId()) && !pm.getId().getUserId().equals(invitation.getInviterId())) {
+                            createNotification(
+                                    pm.getId().getUserId().toString(),
+                                    "Thành viên mới tham gia dự án",
+                                    user.getFullname() + " đã đồng ý tham gia dự án \"" + targetName + "\".",
+                                    "WORKSPACE"
+                            );
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to send project member join notifications: " + e.getMessage());
+                }
             } else {
                 // Thêm vào Workspace Member với vai trò được mời
                 WorkspaceMemberId memberId = new WorkspaceMemberId(workspaceIdToJoin, user.getId());
@@ -268,6 +285,23 @@ public class NotificationService {
                     }
                 } catch (Exception e) {
                     System.err.println("Failed to broadcast workspace/project member add: " + e.getMessage());
+                }
+
+                // Gửi thông báo đến tất cả thành viên khác trong Workspace
+                try {
+                    List<WorkspaceMemberEntity> wsMembers = workspaceMemberRepository.findByIdWorkspaceId(workspaceIdToJoin);
+                    for (WorkspaceMemberEntity wm : wsMembers) {
+                        if (!wm.getId().getUserId().equals(user.getId()) && !wm.getId().getUserId().equals(invitation.getInviterId())) {
+                            createNotification(
+                                    wm.getId().getUserId().toString(),
+                                    "Thành viên mới tham gia Workspace",
+                                    user.getFullname() + " đã đồng ý tham gia Workspace \"" + targetName + "\".",
+                                    "WORKSPACE"
+                            );
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to send workspace member join notifications: " + e.getMessage());
                 }
             }
 

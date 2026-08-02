@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface ProjectMemberRepository extends JpaRepository<ProjectMemberEntity, ProjectMemberId> {
     boolean existsByIdProjectIdAndIdUserId(UUID projectId, UUID userId);
 
+    List<ProjectMemberEntity> findByIdProjectId(UUID projectId);
+
     @Query("SELECT p FROM ProjectEntity p WHERE p.workspaceId = :workspaceId AND p.id IN (SELECT pm.id.projectId FROM ProjectMemberEntity pm WHERE pm.id.userId = :userId)")
     List<ProjectEntity> findUserProjectsInWorkspace(@Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId);
 

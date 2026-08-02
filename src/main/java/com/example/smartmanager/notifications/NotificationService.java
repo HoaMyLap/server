@@ -435,8 +435,91 @@ public class NotificationService {
             leaveReq.setUpdatedAt(LocalDateTime.now());
             invitationRepository.save(leaveReq);
 
-            // Gỡ khỏi Workspace Member
-            workspaceMemberRepository.deleteById(new WorkspaceMemberId(workspaceIdToLeave, requestingUser.getId()));
+            if ("PROJECT".equalsIgnoreCase(leaveReq.getTargetType())) {
+                // Gỡ khỏi project_members
+                ProjectMemberId pmId = new ProjectMemberId(leaveReq.getTargetId(), requestingUser.getId());
+                projectMemberRepository.deleteById(pmId);
+
+                // Phát tin nhắn realtime cho dự án qua WebSocket
+                try {
+                    java.util.Map<String, Object> socketMsg = new java.util.HashMap<>();
+                    socketMsg.put("action", "REMOVE_MEMBER");
+                    socketMsg.put("projectId", leaveReq.getTargetId().toString());
+                    java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                    payload.put("userId", requestingUser.getId().toString());
+                    socketMsg.put("payload", payload);
+                    messagingTemplate.convertAndSend("/topic/projects/" + leaveReq.getTargetId().toString(), socketMsg);
+                } catch (Exception e) {
+                    System.err.println("Failed to broadcast project member remove: " + e.getMessage());
+                }
+
+                // Gửi thông báo đến tất cả thành viên khác trong Dự án
+                try {
+                    List<ProjectMemberEntity> pMembers = projectMemberRepository.findByIdProjectId(leaveReq.getTargetId());
+                    for (ProjectMemberEntity pm : pMembers) {
+                        if (!pm.getId().getUserId().equals(requestingUser.getId())) {
+                            createNotification(
+                                    pm.getId().getUserId().toString(),
+                                    "Thành viên đã rời dự án",
+                                    requestingUser.getFullname() + " đã rời khỏi dự án \"" + targetName + "\".",
+                                    "WORKSPACE"
+                            );
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to send project member leave notifications: " + e.getMessage());
+                }
+            } else {
+                // Gỡ khỏi Workspace Member
+                workspaceMemberRepository.deleteById(new WorkspaceMemberId(workspaceIdToLeave, requestingUser.getId()));
+
+                // Gỡ khỏi tất cả dự án trong Workspace
+                List<ProjectEntity> allProjects = projectRepository.findByWorkspaceId(workspaceIdToLeave);
+                for (ProjectEntity p : allProjects) {
+                    projectMemberRepository.deleteById(new ProjectMemberId(p.getId(), requestingUser.getId()));
+                }
+
+                // Phát tin nhắn realtime cho Workspace và toàn bộ các Dự án con
+                try {
+                    java.util.Map<String, Object> socketMsg = new java.util.HashMap<>();
+                    socketMsg.put("action", "REMOVE_MEMBER");
+                    socketMsg.put("workspaceId", workspaceIdToLeave.toString());
+                    java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                    payload.put("userId", requestingUser.getId().toString());
+                    socketMsg.put("payload", payload);
+
+                    // Gửi đến workspace topic
+                    messagingTemplate.convertAndSend("/topic/workspaces/" + workspaceIdToLeave.toString(), socketMsg);
+
+                    // Gửi đến từng dự án trong workspace
+                    for (ProjectEntity p : allProjects) {
+                        java.util.Map<String, Object> pSocketMsg = new java.util.HashMap<>();
+                        pSocketMsg.put("action", "REMOVE_MEMBER");
+                        pSocketMsg.put("projectId", p.getId().toString());
+                        pSocketMsg.put("payload", payload);
+                        messagingTemplate.convertAndSend("/topic/projects/" + p.getId().toString(), pSocketMsg);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to broadcast workspace/project member remove: " + e.getMessage());
+                }
+
+                // Gửi thông báo đến tất cả thành viên khác trong Workspace
+                try {
+                    List<WorkspaceMemberEntity> wsMembers = workspaceMemberRepository.findByIdWorkspaceId(workspaceIdToLeave);
+                    for (WorkspaceMemberEntity wm : wsMembers) {
+                        if (!wm.getId().getUserId().equals(requestingUser.getId())) {
+                            createNotification(
+                                    wm.getId().getUserId().toString(),
+                                    "Thành viên đã rời Workspace",
+                                    requestingUser.getFullname() + " đã rời khỏi Workspace \"" + targetName + "\".",
+                                    "WORKSPACE"
+                            );
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to send workspace member leave notifications: " + e.getMessage());
+                }
+            }
 
             // Gửi thông báo kết quả cho người dùng
             createNotification(

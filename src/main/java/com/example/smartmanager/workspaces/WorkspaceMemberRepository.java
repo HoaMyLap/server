@@ -18,9 +18,10 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
     @Query("SELECT wm.role FROM WorkspaceMemberEntity wm WHERE wm.id.workspaceId = :workspaceId AND wm.id.userId = :userId")
     Optional<String> findRoleByWorkspaceIdAndUserId(@Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId);
 
-    @Query("SELECT new com.example.smartmanager.workspaces.WorkspaceMemberDto(u.id, u.email, u.fullname, u.avatarUrl, wm.role) " +
+    @Query("SELECT new com.example.smartmanager.workspaces.WorkspaceMemberDto(u.id, u.email, u.fullname, u.avatarUrl, wm.role, wm.roleId, wr.name) " +
            "FROM WorkspaceMemberEntity wm " +
            "JOIN com.example.smartmanager.users.UserEntity u ON wm.id.userId = u.id " +
+           "LEFT JOIN com.example.smartmanager.workspaces.WorkspaceRoleEntity wr ON wm.roleId = wr.id " +
            "WHERE wm.id.workspaceId = :workspaceId")
     List<WorkspaceMemberDto> findMembersWithDetails(@Param("workspaceId") UUID workspaceId);
 

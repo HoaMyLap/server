@@ -5,22 +5,26 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "workspace_members")
+@Table(name = "workspace_roles")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class WorkspaceMemberEntity {
+public class WorkspaceRoleEntity {
 
-    @EmbeddedId
-    private WorkspaceMemberId id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(name = "workspace_id", nullable = false)
+    private UUID workspaceId;
 
     @Column(nullable = false)
-    private String role = "MEMBER"; // ADMIN, MEMBER, VIEWER
+    private String name;
 
-    @Column(name = "role_id")
-    private java.util.UUID roleId;
+    private String description;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

@@ -1,6 +1,6 @@
 package com.example.smartmanager.auth;
 
-import com.example.smartmanager.workspaces.WorkspaceMemberRepository;
+import com.example.smartmanager.workspaces.*;
 import com.example.smartmanager.projects.ProjectRepository;
 import com.example.smartmanager.projects.ProjectMemberRepository;
 import com.example.smartmanager.projects.ProjectEntity;
@@ -21,10 +21,67 @@ public class SecurityService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final TaskRepository taskRepository;
+    private final WorkspaceRolePermissionRepository rolePermissionRepository;
+    private final WorkspaceMemberPermissionRepository memberPermissionRepository;
 
     /**
-     * Kiểm tra xem người dùng hiện tại có vai trò tương ứng (hoặc cao hơn) trong Workspace không.
-     * Thừa kế quyền: ADMIN > MEMBER > VIEWER.
+     * Checks if a user has a specific granular permission in a workspace.
+     * Evaluates member overrides, custom role permissions, or system defaults.
+     */
+    public boolean hasPermission(UUID workspaceId, UUID userId, String requiredPermission) {
+        // 1. Check direct member permission overrides
+        Optional<WorkspaceMemberPermissionEntity> overrideOpt = memberPermissionRepository.findById(
+                new WorkspaceMemberPermissionId(workspaceId, userId, requiredPermission)
+        );
+        if (overrideOpt.isPresent()) {
+            return overrideOpt.get().isAllowed();
+        }
+
+        // 2. Retrieve member record
+        Optional<WorkspaceMemberEntity> memberOpt = workspaceMemberRepository.findById(
+                new WorkspaceMemberId(workspaceId, userId)
+        );
+        if (memberOpt.isEmpty()) {
+            return false;
+        }
+
+        WorkspaceMemberEntity member = memberOpt.get();
+
+        // 3. Admin default bypass
+        if ("ADMIN".equals(member.getRole())) {
+            return true;
+        }
+
+        // 4. Custom role check
+        if (member.getRoleId() != null) {
+            Optional<WorkspaceRolePermissionEntity> rolePermOpt = rolePermissionRepository.findById(
+                    new WorkspaceRolePermissionId(member.getRoleId(), requiredPermission)
+            );
+            return rolePermOpt.isPresent();
+        }
+
+        // 5. Default roles fallback mapping
+        String userRole = member.getRole();
+        if ("MEMBER".equals(userRole)) {
+            // MEMBERS can do everything except administrative tasks
+            return !"WORKSPACE_UPDATE".equals(requiredPermission) &&
+                   !"WORKSPACE_DELETE".equals(requiredPermission) &&
+                   !"WORKSPACE_ROLE_MANAGE".equals(requiredPermission) &&
+                   !"WORKSPACE_MEMBER_REMOVE".equals(requiredPermission);
+        }
+
+        if ("VIEWER".equals(userRole)) {
+            // VIEWERS can only view
+            return "WORKSPACE_VIEW".equals(requiredPermission) ||
+                   "PROJECT_VIEW".equals(requiredPermission) ||
+                   "TASK_VIEW".equals(requiredPermission);
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks workspace role constraints mapped to permissions.
      */
     public boolean hasWorkspaceRole(String workspaceId, String requiredRole) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -37,31 +94,23 @@ public class SecurityService {
             return false;
         }
 
-        String userId = userPrincipal.getId();
-        Optional<String> roleOpt = workspaceMemberRepository.findRoleByWorkspaceIdAndUserId(
-                UUID.fromString(workspaceId),
-                UUID.fromString(userId)
-        );
-        
-        if (roleOpt.isEmpty()) {
-            return false;
-        }
+        UUID uId = UUID.fromString(userPrincipal.getId());
+        UUID wsId = UUID.fromString(workspaceId);
 
-        String userRole = roleOpt.get();
-        
-        if ("ADMIN".equals(userRole)) {
-            return true;
+        if ("ADMIN".equals(requiredRole)) {
+            return hasPermission(wsId, uId, "WORKSPACE_ROLE_MANAGE") || 
+                   hasPermission(wsId, uId, "WORKSPACE_UPDATE");
         }
-        
-        if ("MEMBER".equals(userRole)) {
-            return "MEMBER".equals(requiredRole) || "VIEWER".equals(requiredRole);
+        if ("MEMBER".equals(requiredRole)) {
+            return hasPermission(wsId, uId, "PROJECT_CREATE") || 
+                   hasPermission(wsId, uId, "TASK_CREATE") ||
+                   hasPermission(wsId, uId, "WORKSPACE_MEMBER_INVITE");
         }
-        
-        return "VIEWER".equals(userRole) && "VIEWER".equals(requiredRole);
+        return hasPermission(wsId, uId, "WORKSPACE_VIEW");
     }
 
     /**
-     * Kiểm tra xem người dùng hiện tại có vai trò trong Workspace chứa Project hoặc thuộc Project Member hay không.
+     * Checks project role constraints mapped to permissions.
      */
     public boolean hasProjectRole(String projectId, String requiredRole) {
         try {
@@ -74,26 +123,24 @@ public class SecurityService {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal userPrincipal) {
                 UUID userId = UUID.fromString(userPrincipal.getId());
+                UUID wsId = projectOpt.get().getWorkspaceId();
 
-                // 1. Kiểm tra vai trò trong Workspace
-                Optional<String> wsRoleOpt = workspaceMemberRepository.findRoleByWorkspaceIdAndUserId(
-                        projectOpt.get().getWorkspaceId(),
-                        userId
-                );
-                if (wsRoleOpt.isPresent()) {
-                    String wsRole = wsRoleOpt.get();
-                    if ("ADMIN".equals(wsRole)) {
-                        return true; // Workspace Admin có tất cả các quyền
+                // 1. Check workspace level permissions override/inheritance
+                if ("ADMIN".equals(requiredRole)) {
+                    if (hasPermission(wsId, userId, "PROJECT_DELETE") || hasPermission(wsId, userId, "WORKSPACE_ROLE_MANAGE")) {
+                        return true;
                     }
-                    if ("MEMBER".equals(wsRole)) {
-                        // Quyền MEMBER được thừa kế xem và làm việc, ngoại trừ quyền ADMIN dự án
-                        if (!"ADMIN".equals(requiredRole)) {
-                            return true;
-                        }
+                } else if ("MEMBER".equals(requiredRole)) {
+                    if (hasPermission(wsId, userId, "TASK_CREATE") || hasPermission(wsId, userId, "TASK_UPDATE")) {
+                        return true;
+                    }
+                } else { // VIEWER
+                    if (hasPermission(wsId, userId, "PROJECT_VIEW")) {
+                        return true;
                     }
                 }
 
-                // 2. Kiểm tra vai trò trực tiếp trong Project Member
+                // 2. Check project members level
                 Optional<com.example.smartmanager.projects.ProjectMemberEntity> pmOpt = projectMemberRepository.findById(
                         new com.example.smartmanager.projects.ProjectMemberId(projId, userId)
                 );
@@ -115,7 +162,7 @@ public class SecurityService {
     }
 
     /**
-     * Kiểm tra xem người dùng hiện tại có vai trò trong Workspace chứa Task hay không.
+     * Checks task role constraints mapped to permissions.
      */
     public boolean hasTaskRole(String taskId, String requiredRole) {
         try {

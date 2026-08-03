@@ -153,7 +153,7 @@ public class WorkspaceRoleController {
     }
 
     @GetMapping("/members/{userId}/permissions")
-    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'ADMIN')")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'ADMIN') or #userId == principal.id")
     public ResponseEntity<?> getMemberPermissions(
             @PathVariable("workspaceId") String workspaceId,
             @PathVariable("userId") String userId) {

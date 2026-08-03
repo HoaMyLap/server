@@ -8,11 +8,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "project_files")
+@Table(name = "project_folders")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProjectFileEntity {
+public class ProjectFolderEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -21,23 +21,15 @@ public class ProjectFileEntity {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String url;
-
-    @Column(nullable = false)
-    private Long size = 0L;
-
-    private String type;
-
     @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
-    @Column(name = "folder_id")
-    private UUID folderId;
+    @Column(name = "parent_id")
+    private UUID parentId; // null means root folder
 
-    @Column(name = "uploader_id")
-    private UUID uploaderId;
+    @Column(name = "created_by")
+    private UUID createdBy;
 
-    @Column(name = "uploaded_at", nullable = false, updatable = false)
-    private LocalDateTime uploadedAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

@@ -24,6 +24,7 @@ public class ProjectService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final ProjectDeletionRequestRepository projectDeletionRequestRepository;
+    private final ProjectFolderRepository projectFolderRepository;
 
     @Transactional
     public ProjectEntity createProject(ProjectEntity project, String userId) {
@@ -119,6 +120,60 @@ public class ProjectService {
 
     public List<ProjectFileEntity> getProjectFiles(String projectId) {
         return projectFileRepository.findByProjectIdOrderByUploadedAtDesc(UUID.fromString(projectId));
+    }
+
+    public List<ProjectFileEntity> getProjectFilesFiltered(String projectId, String folderId) {
+        UUID projId = UUID.fromString(projectId);
+        if (folderId == null || folderId.trim().isEmpty() || "null".equalsIgnoreCase(folderId)) {
+            return projectFileRepository.findByProjectIdAndFolderIdIsNullOrderByUploadedAtDesc(projId);
+        } else {
+            return projectFileRepository.findByProjectIdAndFolderIdOrderByUploadedAtDesc(projId, UUID.fromString(folderId));
+        }
+    }
+
+    public List<ProjectFolderEntity> getProjectFolders(String projectId, String parentId) {
+        UUID projId = UUID.fromString(projectId);
+        if (parentId == null || parentId.trim().isEmpty() || "null".equalsIgnoreCase(parentId)) {
+            return projectFolderRepository.findByProjectIdAndParentIdIsNull(projId);
+        } else {
+            return projectFolderRepository.findByProjectIdAndParentId(projId, UUID.fromString(parentId));
+        }
+    }
+
+    @Transactional
+    public ProjectFolderEntity createFolder(String projectId, String name, String parentId, String creatorId) {
+        ProjectFolderEntity folder = new ProjectFolderEntity();
+        folder.setProjectId(UUID.fromString(projectId));
+        folder.setName(name);
+        if (parentId != null && !parentId.trim().isEmpty() && !"null".equalsIgnoreCase(parentId)) {
+            folder.setParentId(UUID.fromString(parentId));
+        }
+        if (creatorId != null && !creatorId.trim().isEmpty() && !"null".equalsIgnoreCase(creatorId)) {
+            folder.setCreatedBy(UUID.fromString(creatorId));
+        }
+        folder.setCreatedAt(LocalDateTime.now());
+        return projectFolderRepository.save(folder);
+    }
+
+    @Transactional
+    public void deleteFolder(String folderId) {
+        deleteFolderRecursive(UUID.fromString(folderId));
+    }
+
+    private void deleteFolderRecursive(UUID folderId) {
+        Optional<ProjectFolderEntity> folderOpt = projectFolderRepository.findById(folderId);
+        if (folderOpt.isEmpty()) return;
+        UUID projectId = folderOpt.get().getProjectId();
+        
+        List<ProjectFolderEntity> subfolders = projectFolderRepository.findByProjectIdAndParentId(projectId, folderId);
+        for (ProjectFolderEntity sub : subfolders) {
+            deleteFolderRecursive(sub.getId());
+        }
+        
+        List<ProjectFileEntity> files = projectFileRepository.findByFolderId(folderId);
+        projectFileRepository.deleteAll(files);
+        
+        projectFolderRepository.deleteById(folderId);
     }
 
     @Transactional

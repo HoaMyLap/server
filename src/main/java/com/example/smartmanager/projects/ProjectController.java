@@ -84,8 +84,10 @@ public class ProjectController {
 
     @GetMapping("/{projectId}/files")
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
-    public ResponseEntity<List<ProjectFileEntity>> getProjectFiles(@PathVariable("projectId") String projectId) {
-        return ResponseEntity.ok(projectService.getProjectFiles(projectId));
+    public ResponseEntity<List<ProjectFileEntity>> getProjectFiles(
+            @PathVariable("projectId") String projectId,
+            @RequestParam(value = "folderId", required = false) String folderId) {
+        return ResponseEntity.ok(projectService.getProjectFilesFiltered(projectId, folderId));
     }
 
     @PostMapping("/{projectId}/files")
@@ -108,6 +110,47 @@ public class ProjectController {
         try {
             projectService.deleteProjectFile(fileId);
             return ResponseEntity.ok(Map.of("message", "Xóa tệp tin thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{projectId}/folders")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
+    public ResponseEntity<List<ProjectFolderEntity>> getProjectFolders(
+            @PathVariable("projectId") String projectId,
+            @RequestParam(value = "parentId", required = false) String parentId) {
+        return ResponseEntity.ok(projectService.getProjectFolders(projectId, parentId));
+    }
+
+    @PostMapping("/{projectId}/folders")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
+    public ResponseEntity<?> createProjectFolder(
+            @PathVariable("projectId") String projectId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            String name = body.get("name");
+            if (name == null || name.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Tên thư mục không được để trống"));
+            }
+            String parentId = body.get("parentId");
+            String creatorId = userPrincipal != null ? userPrincipal.getId() : null;
+            ProjectFolderEntity folder = projectService.createFolder(projectId, name, parentId, creatorId);
+            return ResponseEntity.ok(folder);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{projectId}/folders/{folderId}")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
+    public ResponseEntity<?> deleteProjectFolder(
+            @PathVariable("projectId") String projectId,
+            @PathVariable("folderId") String folderId) {
+        try {
+            projectService.deleteFolder(folderId);
+            return ResponseEntity.ok(Map.of("message", "Xóa thư mục thành công"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

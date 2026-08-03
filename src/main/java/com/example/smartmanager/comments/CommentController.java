@@ -88,4 +88,13 @@ public class CommentController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/{id}/likes")
+    public ResponseEntity<?> getCommentLikes(@PathVariable("id") String commentId) {
+        try {
+            return ResponseEntity.ok(commentService.getCommentLikes(commentId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

@@ -6,6 +6,13 @@ import com.example.smartmanager.tasks.TaskLogRepository;
 import com.example.smartmanager.tasks.TaskRepository;
 import com.example.smartmanager.tasks.TaskMessage;
 import com.example.smartmanager.notifications.NotificationService;
+import com.example.smartmanager.users.UserRepository;
+import com.example.smartmanager.projects.ProjectRepository;
+import com.example.smartmanager.projects.ProjectMemberRepository;
+import com.example.smartmanager.projects.ProjectMemberId;
+import com.example.smartmanager.workspaces.WorkspaceMemberRepository;
+import com.example.smartmanager.workspaces.WorkspaceMemberId;
+import com.example.smartmanager.workspaces.WorkspaceRoleRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,6 +33,12 @@ public class CommentService {
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
     private final RedisTemplate<String, Object> redisTemplate;
+    
+    private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final WorkspaceRoleRepository workspaceRoleRepository;
+    private final ProjectMemberRepository projectMemberRepository;
 
     public CommentService(
             CommentRepository commentRepository,
@@ -33,13 +46,24 @@ public class CommentService {
             TaskRepository taskRepository,
             SimpMessagingTemplate messagingTemplate,
             NotificationService notificationService,
-            @Qualifier("redisTemplate") RedisTemplate<String, Object> redisTemplate) {
+            @Qualifier("redisTemplate") RedisTemplate<String, Object> redisTemplate,
+            UserRepository userRepository,
+            ProjectRepository projectRepository,
+            WorkspaceMemberRepository workspaceMemberRepository,
+            WorkspaceRoleRepository workspaceRoleRepository,
+            ProjectMemberRepository projectMemberRepository) {
         this.commentRepository = commentRepository;
         this.taskLogRepository = taskLogRepository;
         this.taskRepository = taskRepository;
         this.messagingTemplate = messagingTemplate;
         this.notificationService = notificationService;
         this.redisTemplate = redisTemplate;
+        
+        this.userRepository = userRepository;
+        this.projectRepository = projectRepository;
+        this.workspaceMemberRepository = workspaceMemberRepository;
+        this.workspaceRoleRepository = workspaceRoleRepository;
+        this.projectMemberRepository = projectMemberRepository;
     }
 
     public void setViewingDiscussion(String taskId, String userId, boolean viewing) {
@@ -140,6 +164,9 @@ public class CommentService {
             System.err.println("Failed to send comment notifications: " + e.getMessage());
         }
 
+        // Enrich comment metadata (author name, role badges)
+        enrichComment(saved, task);
+
         // Phát tin nhắn realtime qua WebSocket
         TaskMessage message = new TaskMessage(
                 "ADD_COMMENT",
@@ -154,7 +181,33 @@ public class CommentService {
     }
 
     public List<CommentEntity> getTaskComments(String taskId) {
-        return commentRepository.findByTaskIdOrderByCreatedAtAsc(UUID.fromString(taskId));
+        List<CommentEntity> all = commentRepository.findByTaskIdOrderByCreatedAtAsc(UUID.fromString(taskId));
+        List<CommentEntity> roots = all.stream()
+                .filter(c -> c.getParentCommentId() == null)
+                .sorted((c1, c2) -> c2.getCreatedAt().compareTo(c1.getCreatedAt()))
+                .toList();
+
+        List<CommentEntity> replies = all.stream()
+                .filter(c -> c.getParentCommentId() != null)
+                .sorted((c1, c2) -> c1.getCreatedAt().compareTo(c2.getCreatedAt()))
+                .toList();
+
+        java.util.List<CommentEntity> sortedList = new java.util.ArrayList<>();
+        for (CommentEntity root : roots) {
+            sortedList.add(root);
+            for (CommentEntity reply : replies) {
+                if (reply.getParentCommentId().equals(root.getId())) {
+                    sortedList.add(reply);
+                }
+            }
+        }
+        
+        TaskEntity task = taskRepository.findById(UUID.fromString(taskId)).orElse(null);
+        for (CommentEntity c : sortedList) {
+            enrichComment(c, task);
+        }
+        
+        return sortedList;
     }
 
     @Transactional
@@ -171,6 +224,7 @@ public class CommentService {
         CommentEntity saved = commentRepository.save(comment);
 
         TaskEntity task = taskRepository.findById(saved.getTaskId()).orElse(null);
+        enrichComment(saved, task);
         if (task != null) {
             TaskMessage message = new TaskMessage(
                     "UPDATE_COMMENT",
@@ -225,6 +279,7 @@ public class CommentService {
         CommentEntity saved = commentRepository.save(comment);
 
         TaskEntity task = taskRepository.findById(saved.getTaskId()).orElse(null);
+        enrichComment(saved, task);
         if (task != null) {
             // Gửi thông báo cho tác giả nếu được thích và họ không đang xem thảo luận
             if (isLikedNow && saved.getUserId() != null && !saved.getUserId().toString().equals(userId)) {
@@ -253,5 +308,52 @@ public class CommentService {
         }
 
         return saved;
+    }
+
+    private void enrichComment(CommentEntity comment, TaskEntity task) {
+        if (comment == null) return;
+
+        userRepository.findById(comment.getUserId()).ifPresent(user -> {
+            comment.setAuthorName(user.getFullname());
+            comment.setAuthorAvatarUrl(user.getAvatarUrl());
+        });
+
+        if (task == null) {
+            task = taskRepository.findById(comment.getTaskId()).orElse(null);
+        }
+
+        if (task != null) {
+            if (task.getProjectId() != null) {
+                projectRepository.findById(task.getProjectId()).ifPresent(proj -> {
+                    UUID wsId = proj.getWorkspaceId();
+                    if (wsId != null) {
+                        workspaceMemberRepository.findById(new WorkspaceMemberId(wsId, comment.getUserId())).ifPresent(member -> {
+                            if (member.getRoleId() != null) {
+                                workspaceRoleRepository.findById(member.getRoleId()).ifPresent(r -> {
+                                    comment.setWorkspaceRole(r.getName());
+                                });
+                            } else {
+                                comment.setWorkspaceRole(member.getRole());
+                            }
+                        });
+                    }
+                });
+
+                projectMemberRepository.findById(new ProjectMemberId(task.getProjectId(), comment.getUserId())).ifPresent(member -> {
+                    comment.setProjectRole(member.getRole());
+                });
+            }
+
+            comment.setIsTaskAssignee(task.getAssigneeId() != null && task.getAssigneeId().equals(comment.getUserId()));
+        }
+    }
+
+    public List<com.example.smartmanager.users.UserEntity> getCommentLikes(String commentId) {
+        CommentEntity comment = commentRepository.findById(UUID.fromString(commentId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bình luận"));
+        if (comment.getLikedUserIds().isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return userRepository.findAllById(comment.getLikedUserIds());
     }
 }

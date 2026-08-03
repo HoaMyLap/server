@@ -23,6 +23,7 @@ public class ProjectService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final ProjectDeletionRequestRepository projectDeletionRequestRepository;
 
     @Transactional
     public ProjectEntity createProject(ProjectEntity project, String userId) {
@@ -143,5 +144,123 @@ public class ProjectService {
 
     public List<WorkspaceMemberDto> getProjectMembers(String projectId) {
         return projectMemberRepository.findProjectMembersWithDetails(UUID.fromString(projectId));
+    }
+
+    @Transactional
+    public ProjectDeletionRequestEntity createDeletionRequest(String projectId, String userId, String reason) {
+        ProjectEntity project = getProjectById(projectId);
+        
+        project.setStatus("DELETION_PENDING");
+        project.setUpdatedAt(LocalDateTime.now());
+        projectRepository.save(project);
+
+        ProjectDeletionRequestEntity request = new ProjectDeletionRequestEntity();
+        request.setProjectId(project.getId());
+        request.setRequesterId(UUID.fromString(userId));
+        request.setReason(reason);
+        request.setStatus("PENDING");
+        request.setCreatedAt(LocalDateTime.now());
+        ProjectDeletionRequestEntity savedRequest = projectDeletionRequestRepository.save(request);
+
+        try {
+            String requesterName = userRepository.findById(UUID.fromString(userId))
+                    .map(UserEntity::getFullname).orElse("Admin Dự án");
+
+            List<WorkspaceMemberEntity> wsMembers = workspaceMemberRepository.findByIdWorkspaceId(project.getWorkspaceId());
+            for (WorkspaceMemberEntity wm : wsMembers) {
+                if ("ADMIN".equalsIgnoreCase(wm.getRole())) {
+                    notificationService.createNotification(
+                        wm.getId().getUserId().toString(),
+                        "Yêu cầu xóa dự án cần phê duyệt",
+                        requesterName + " đã gửi yêu cầu xóa dự án \"" + project.getName() + "\". Vui lòng phê duyệt.",
+                        "PROJECT"
+                    );
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to send deletion request notifications: " + e.getMessage());
+        }
+
+        return savedRequest;
+    }
+
+    public List<ProjectDeletionRequestEntity> getPendingDeletionRequests(String workspaceId) {
+        return projectDeletionRequestRepository.findByWorkspaceIdAndStatus(UUID.fromString(workspaceId), "PENDING");
+    }
+
+    @Transactional
+    public void approveDeletionRequest(String requestId, String adminId) {
+        ProjectDeletionRequestEntity request = projectDeletionRequestRepository.findById(UUID.fromString(requestId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy yêu cầu xóa dự án"));
+        
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new IllegalStateException("Yêu cầu này đã được xử lý");
+        }
+
+        ProjectEntity project = getProjectById(request.getProjectId().toString());
+        
+        // Xác minh người phê duyệt là Workspace Admin
+        UUID wsId = project.getWorkspaceId();
+        workspaceMemberRepository.findById(new com.example.smartmanager.workspaces.WorkspaceMemberId(wsId, UUID.fromString(adminId)))
+                .filter(m -> "ADMIN".equalsIgnoreCase(m.getRole()))
+                .orElseThrow(() -> new IllegalArgumentException("Chỉ Admin Workspace mới có quyền phê duyệt yêu cầu này"));
+
+        request.setStatus("APPROVED");
+        projectDeletionRequestRepository.save(request);
+
+        projectRepository.delete(project);
+
+        try {
+            notificationService.createNotification(
+                request.getRequesterId().toString(),
+                "Yêu cầu xóa dự án đã được chấp thuận",
+                "Yêu cầu xóa dự án của bạn đã được Admin Workspace phê duyệt và thực hiện.",
+                "PROJECT"
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to send deletion approval notification: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void rejectDeletionRequest(String requestId, String adminId) {
+        ProjectDeletionRequestEntity request = projectDeletionRequestRepository.findById(UUID.fromString(requestId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy yêu cầu xóa dự án"));
+
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new IllegalStateException("Yêu cầu này đã được xử lý");
+        }
+
+        ProjectEntity project = getProjectById(request.getProjectId().toString());
+
+        // Xác minh người từ chối là Workspace Admin
+        UUID wsId = project.getWorkspaceId();
+        workspaceMemberRepository.findById(new com.example.smartmanager.workspaces.WorkspaceMemberId(wsId, UUID.fromString(adminId)))
+                .filter(m -> "ADMIN".equalsIgnoreCase(m.getRole()))
+                .orElseThrow(() -> new IllegalArgumentException("Chỉ Admin Workspace mới có quyền từ chối yêu cầu này"));
+
+        request.setStatus("REJECTED");
+        projectDeletionRequestRepository.save(request);
+
+        project.setStatus("ACTIVE");
+        project.setUpdatedAt(LocalDateTime.now());
+        projectRepository.save(project);
+
+        try {
+            notificationService.createNotification(
+                request.getRequesterId().toString(),
+                "Yêu cầu xóa dự án bị từ chối",
+                "Yêu cầu xóa dự án \"" + project.getName() + "\" của bạn đã bị Admin Workspace từ chối.",
+                "PROJECT"
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to send deletion rejection notification: " + e.getMessage());
+        }
+    }
+
+    public boolean isWorkspaceAdmin(String workspaceId, String userId) {
+        return workspaceMemberRepository.findById(new com.example.smartmanager.workspaces.WorkspaceMemberId(UUID.fromString(workspaceId), UUID.fromString(userId)))
+                .map(m -> "ADMIN".equalsIgnoreCase(m.getRole()))
+                .orElse(false);
     }
 }

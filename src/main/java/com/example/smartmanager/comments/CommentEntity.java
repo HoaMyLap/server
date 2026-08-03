@@ -32,6 +32,9 @@ public class CommentEntity {
     @Column(name = "parent_comment_id")
     private UUID parentCommentId;
 
+    @Column(name = "reply_to_user_id")
+    private UUID replyToUserId;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "comment_likes", joinColumns = @JoinColumn(name = "comment_id"))
     @Column(name = "liked_user_id")
@@ -42,4 +45,19 @@ public class CommentEntity {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @Transient
+    private String authorName;
+
+    @Transient
+    private String authorAvatarUrl;
+
+    @Transient
+    private String workspaceRole;
+
+    @Transient
+    private String projectRole;
+
+    @Transient
+    private Boolean isTaskAssignee;
 }

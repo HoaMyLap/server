@@ -66,8 +66,15 @@ public class ProjectController {
 
     @DeleteMapping("/{projectId}")
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'ADMIN')")
-    public ResponseEntity<?> deleteProject(@PathVariable("projectId") String projectId) {
+    public ResponseEntity<?> deleteProject(
+            @PathVariable("projectId") String projectId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
         try {
+            ProjectEntity project = projectService.getProjectById(projectId);
+            boolean isWsAdmin = projectService.isWorkspaceAdmin(project.getWorkspaceId().toString(), userPrincipal.getId());
+            if (!isWsAdmin) {
+                return ResponseEntity.status(403).body(Map.of("error", "Chỉ Admin Workspace mới có quyền xóa dự án trực tiếp. Admin Dự án cần gửi yêu cầu xóa để được phê duyệt."));
+            }
             projectService.deleteProject(projectId);
             return ResponseEntity.ok(Map.of("message", "Xóa dự án thành công"));
         } catch (Exception e) {
@@ -110,5 +117,54 @@ public class ProjectController {
     @PreAuthorize("@securityService.hasProjectRole(#projectId, 'VIEWER')")
     public ResponseEntity<List<com.example.smartmanager.workspaces.WorkspaceMemberDto>> getProjectMembers(@PathVariable("projectId") String projectId) {
         return ResponseEntity.ok(projectService.getProjectMembers(projectId));
+    }
+
+    @PostMapping("/{projectId}/deletion-request")
+    @PreAuthorize("@securityService.hasProjectRole(#projectId, 'ADMIN')")
+    public ResponseEntity<?> createDeletionRequest(
+            @PathVariable("projectId") String projectId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            String reason = body.get("reason");
+            ProjectDeletionRequestEntity request = projectService.createDeletionRequest(projectId, userPrincipal.getId(), reason);
+            return ResponseEntity.ok(request);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/workspace/{workspaceId}/deletion-requests")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'ADMIN')")
+    public ResponseEntity<?> getPendingDeletionRequests(@PathVariable("workspaceId") String workspaceId) {
+        try {
+            return ResponseEntity.ok(projectService.getPendingDeletionRequests(workspaceId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/deletion-requests/{requestId}/approve")
+    public ResponseEntity<?> approveDeletionRequest(
+            @PathVariable("requestId") String requestId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            projectService.approveDeletionRequest(requestId, userPrincipal.getId());
+            return ResponseEntity.ok(Map.of("message", "Đã phê duyệt xóa dự án thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/deletion-requests/{requestId}/reject")
+    public ResponseEntity<?> rejectDeletionRequest(
+            @PathVariable("requestId") String requestId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            projectService.rejectDeletionRequest(requestId, userPrincipal.getId());
+            return ResponseEntity.ok(Map.of("message", "Đã từ chối yêu cầu xóa dự án"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

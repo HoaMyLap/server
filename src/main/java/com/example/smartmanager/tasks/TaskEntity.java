@@ -48,6 +48,9 @@ public class TaskEntity {
     @Column(name = "parent_task_id")
     private UUID parentTaskId;
 
+    @Column(name = "reminded", nullable = false)
+    private Boolean reminded = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

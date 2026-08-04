@@ -10,6 +10,12 @@ import com.example.smartmanager.projects.ProjectMemberRepository;
 import com.example.smartmanager.projects.ProjectMemberId;
 import com.example.smartmanager.projects.ProjectMemberEntity;
 import com.example.smartmanager.projects.ProjectEntity;
+import com.example.smartmanager.projects.ProjectFileEntity;
+import com.example.smartmanager.projects.ProjectFileRepository;
+import com.example.smartmanager.tasks.TaskEntity;
+import com.example.smartmanager.tasks.TaskFileEntity;
+import com.example.smartmanager.tasks.TaskFileRepository;
+import com.example.smartmanager.tasks.TaskRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -30,6 +36,11 @@ public class WorkspaceService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final WorkspaceFolderRepository workspaceFolderRepository;
+    private final WorkspaceFileRepository workspaceFileRepository;
+    private final ProjectFileRepository projectFileRepository;
+    private final TaskFileRepository taskFileRepository;
+    private final TaskRepository taskRepository;
 
     public WorkspaceService(
             WorkspaceRepository workspaceRepository,
@@ -39,7 +50,12 @@ public class WorkspaceService {
             @Qualifier("redisTemplate") RedisTemplate<String, Object> redisTemplate,
             SimpMessagingTemplate messagingTemplate,
             ProjectRepository projectRepository,
-            ProjectMemberRepository projectMemberRepository) {
+            ProjectMemberRepository projectMemberRepository,
+            WorkspaceFolderRepository workspaceFolderRepository,
+            WorkspaceFileRepository workspaceFileRepository,
+            ProjectFileRepository projectFileRepository,
+            TaskFileRepository taskFileRepository,
+            TaskRepository taskRepository) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
@@ -48,6 +64,11 @@ public class WorkspaceService {
         this.messagingTemplate = messagingTemplate;
         this.projectRepository = projectRepository;
         this.projectMemberRepository = projectMemberRepository;
+        this.workspaceFolderRepository = workspaceFolderRepository;
+        this.workspaceFileRepository = workspaceFileRepository;
+        this.projectFileRepository = projectFileRepository;
+        this.taskFileRepository = taskFileRepository;
+        this.taskRepository = taskRepository;
     }
 
     @Transactional
@@ -233,5 +254,148 @@ public class WorkspaceService {
         } catch (Exception e) {
             System.err.println("Failed to update project roles or broadcast update role: " + e.getMessage());
         }
+    }
+
+    public List<WorkspaceFolderEntity> getWorkspaceFolders(String workspaceId, String parentId) {
+        UUID wsId = UUID.fromString(workspaceId);
+        if (parentId == null || parentId.trim().isEmpty() || "null".equalsIgnoreCase(parentId)) {
+            return workspaceFolderRepository.findByWorkspaceIdAndParentIdIsNull(wsId);
+        } else {
+            return workspaceFolderRepository.findByWorkspaceIdAndParentId(wsId, UUID.fromString(parentId));
+        }
+    }
+
+    public List<WorkspaceFileEntity> getWorkspaceFiles(String workspaceId, String folderId) {
+        UUID wsId = UUID.fromString(workspaceId);
+        if (folderId == null || folderId.trim().isEmpty() || "null".equalsIgnoreCase(folderId)) {
+            return workspaceFileRepository.findByWorkspaceIdAndFolderIdIsNull(wsId);
+        } else {
+            return workspaceFileRepository.findByWorkspaceIdAndFolderId(wsId, UUID.fromString(folderId));
+        }
+    }
+
+    @Transactional
+    public WorkspaceFolderEntity createWorkspaceFolder(String workspaceId, String name, String parentId, String creatorId) {
+        WorkspaceFolderEntity folder = new WorkspaceFolderEntity();
+        folder.setWorkspaceId(UUID.fromString(workspaceId));
+        folder.setName(name);
+        if (parentId != null && !parentId.trim().isEmpty() && !"null".equalsIgnoreCase(parentId)) {
+            folder.setParentId(UUID.fromString(parentId));
+        }
+        if (creatorId != null && !creatorId.trim().isEmpty() && !"null".equalsIgnoreCase(creatorId)) {
+            folder.setCreatedBy(UUID.fromString(creatorId));
+        }
+        folder.setCreatedAt(java.time.LocalDateTime.now());
+        return workspaceFolderRepository.save(folder);
+    }
+
+    @Transactional
+    public void deleteWorkspaceFolder(String folderId) {
+        deleteWorkspaceFolderRecursive(UUID.fromString(folderId));
+    }
+
+    private void deleteWorkspaceFolderRecursive(UUID folderId) {
+        java.util.Optional<WorkspaceFolderEntity> folderOpt = workspaceFolderRepository.findById(folderId);
+        if (folderOpt.isEmpty()) return;
+        UUID workspaceId = folderOpt.get().getWorkspaceId();
+        
+        List<WorkspaceFolderEntity> subfolders = workspaceFolderRepository.findByWorkspaceIdAndParentId(workspaceId, folderId);
+        for (WorkspaceFolderEntity sub : subfolders) {
+            deleteWorkspaceFolderRecursive(sub.getId());
+        }
+        
+        List<WorkspaceFileEntity> files = workspaceFileRepository.findByFolderId(folderId);
+        workspaceFileRepository.deleteAll(files);
+        
+        workspaceFolderRepository.deleteById(folderId);
+    }
+
+    @Transactional
+    public WorkspaceFileEntity saveWorkspaceFile(String workspaceId, WorkspaceFileEntity file, String uploaderId) {
+        file.setWorkspaceId(UUID.fromString(workspaceId));
+        if (uploaderId != null) {
+            file.setUploaderId(UUID.fromString(uploaderId));
+        }
+        file.setUploadedAt(java.time.LocalDateTime.now());
+        return workspaceFileRepository.save(file);
+    }
+
+    @Transactional
+    public void deleteWorkspaceFile(String fileId) {
+        workspaceFileRepository.deleteById(UUID.fromString(fileId));
+    }
+
+    public List<AccessibleDocumentDto> getAllAccessibleDocuments(String workspaceId, String userId) {
+        UUID wsId = UUID.fromString(workspaceId);
+        UUID uId = UUID.fromString(userId);
+        
+        List<AccessibleDocumentDto> documents = new java.util.ArrayList<>();
+        
+        WorkspaceMemberEntity member = workspaceMemberRepository.findById(new WorkspaceMemberId(wsId, uId)).orElse(null);
+        if (member == null) {
+            return documents;
+        }
+        boolean isWorkspaceAdmin = "ADMIN".equalsIgnoreCase(member.getRole());
+        
+        List<WorkspaceFileEntity> wsFiles = workspaceFileRepository.findByWorkspaceId(wsId);
+        for (WorkspaceFileEntity file : wsFiles) {
+            documents.add(new AccessibleDocumentDto(
+                    file.getId().toString(),
+                    file.getName(),
+                    file.getUrl(),
+                    file.getSize(),
+                    file.getType(),
+                    file.getUploadedAt(),
+                    "Workspace",
+                    null
+            ));
+        }
+        
+        List<ProjectEntity> allProjects = projectRepository.findByWorkspaceId(wsId);
+        for (ProjectEntity project : allProjects) {
+            boolean hasProjectAccess = isWorkspaceAdmin;
+            if (!hasProjectAccess) {
+                hasProjectAccess = projectMemberRepository.findById(
+                        new com.example.smartmanager.projects.ProjectMemberId(project.getId(), uId)).isPresent();
+            }
+            
+            if (hasProjectAccess) {
+                List<ProjectFileEntity> projectFiles = 
+                        projectFileRepository.findByProjectIdOrderByUploadedAtDesc(project.getId());
+                for (ProjectFileEntity file : projectFiles) {
+                    documents.add(new AccessibleDocumentDto(
+                            file.getId().toString(),
+                            file.getName(),
+                            file.getUrl(),
+                            file.getSize(),
+                            file.getType(),
+                            file.getUploadedAt(),
+                            "Dự án: " + project.getName(),
+                            project.getId().toString()
+                    ));
+                }
+                
+                List<TaskEntity> tasks = taskRepository.findByProjectId(project.getId());
+                for (TaskEntity task : tasks) {
+                    List<TaskFileEntity> taskFiles = 
+                            taskFileRepository.findByTaskIdOrderByUploadedAtDesc(task.getId());
+                    for (TaskFileEntity file : taskFiles) {
+                        documents.add(new AccessibleDocumentDto(
+                                file.getId().toString(),
+                                file.getName(),
+                                file.getUrl(),
+                                file.getSize(),
+                                file.getType(),
+                                file.getUploadedAt(),
+                                "Công việc (" + task.getTitle() + ") trong dự án \"" + project.getName() + "\"",
+                                project.getId().toString()
+                        ));
+                    }
+                }
+            }
+        }
+        
+        documents.sort((d1, d2) -> d2.getUploadedAt().compareTo(d1.getUploadedAt()));
+        return documents;
     }
 }

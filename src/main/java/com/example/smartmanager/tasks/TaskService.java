@@ -144,6 +144,9 @@ public class TaskService {
         }
 
         task.setStatus(newStatus);
+        if ("DONE".equals(oldStatus) && !"DONE".equals(newStatus)) {
+            task.setReminded(false);
+        }
         task.setPosition(newPosition);
         task.setUpdatedAt(LocalDateTime.now());
         TaskEntity saved = taskRepository.save(task);
@@ -193,6 +196,12 @@ public class TaskService {
     public TaskEntity updateTask(TaskEntity taskDetails, String userId) {
         TaskEntity task = getTaskById(taskDetails.getId().toString());
         UUID oldAssignee = task.getAssigneeId();
+        
+        if (taskDetails.getDueDate() != null && !taskDetails.getDueDate().equals(task.getDueDate())) {
+            task.setReminded(false);
+        } else if (taskDetails.getDueDate() == null && task.getDueDate() != null) {
+            task.setReminded(false);
+        }
         
         task.setTitle(taskDetails.getTitle());
         task.setDescription(taskDetails.getDescription());
@@ -254,6 +263,9 @@ public class TaskService {
         String newStatus = "DONE".equals(oldStatus) ? "TODO" : "DONE";
 
         task.setStatus(newStatus);
+        if ("DONE".equals(oldStatus) && !"DONE".equals(newStatus)) {
+            task.setReminded(false);
+        }
         task.setUpdatedAt(LocalDateTime.now());
         TaskEntity saved = taskRepository.save(task);
 

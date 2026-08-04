@@ -16,4 +16,6 @@ public interface TaskRepository extends JpaRepository<TaskEntity, UUID> {
     List<TaskEntity> findByParentTaskId(UUID parentTaskId);
     
     Optional<TaskEntity> findFirstByProjectIdAndStatusOrderByPositionDesc(UUID projectId, String status);
+
+    List<TaskEntity> findByStatusNotAndDueDateIsNotNullAndDueDateBeforeAndRemindedFalse(String status, java.time.LocalDateTime dueDate);
 }

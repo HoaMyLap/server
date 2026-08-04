@@ -87,4 +87,88 @@ public class WorkspaceController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/{id}/folders")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
+    public ResponseEntity<List<WorkspaceFolderEntity>> getWorkspaceFolders(
+            @PathVariable("id") String workspaceId,
+            @RequestParam(value = "parentId", required = false) String parentId) {
+        return ResponseEntity.ok(workspaceService.getWorkspaceFolders(workspaceId, parentId));
+    }
+
+    @PostMapping("/{id}/folders")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
+    public ResponseEntity<?> createWorkspaceFolder(
+            @PathVariable("id") String workspaceId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            String name = body.get("name");
+            if (name == null || name.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Tên thư mục không được để trống"));
+            }
+            String parentId = body.get("parentId");
+            String creatorId = userPrincipal != null ? userPrincipal.getId() : null;
+            WorkspaceFolderEntity folder = workspaceService.createWorkspaceFolder(workspaceId, name, parentId, creatorId);
+            return ResponseEntity.ok(folder);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}/folders/{folderId}")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
+    public ResponseEntity<?> deleteWorkspaceFolder(
+            @PathVariable("id") String workspaceId,
+            @PathVariable("folderId") String folderId) {
+        try {
+            workspaceService.deleteWorkspaceFolder(folderId);
+            return ResponseEntity.ok(Map.of("message", "Xóa thư mục thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/files")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
+    public ResponseEntity<List<WorkspaceFileEntity>> getWorkspaceFiles(
+            @PathVariable("id") String workspaceId,
+            @RequestParam(value = "folderId", required = false) String folderId) {
+        return ResponseEntity.ok(workspaceService.getWorkspaceFiles(workspaceId, folderId));
+    }
+
+    @PostMapping("/{id}/files")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
+    public ResponseEntity<?> addWorkspaceFile(
+            @PathVariable("id") String workspaceId,
+            @RequestBody WorkspaceFileEntity file,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            WorkspaceFileEntity saved = workspaceService.saveWorkspaceFile(workspaceId, file, userPrincipal != null ? userPrincipal.getId() : null);
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}/files/{fileId}")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
+    public ResponseEntity<?> deleteWorkspaceFile(
+            @PathVariable("id") String workspaceId,
+            @PathVariable("fileId") String fileId) {
+        try {
+            workspaceService.deleteWorkspaceFile(fileId);
+            return ResponseEntity.ok(Map.of("message", "Xóa tệp tin thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/all-accessible-documents")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'VIEWER')")
+    public ResponseEntity<List<AccessibleDocumentDto>> getAllAccessibleDocuments(
+            @PathVariable("id") String workspaceId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.ok(workspaceService.getAllAccessibleDocuments(workspaceId, userPrincipal.getId()));
+    }
 }

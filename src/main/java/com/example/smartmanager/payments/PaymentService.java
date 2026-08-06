@@ -84,7 +84,9 @@ public class PaymentService {
             order.setPaymentUrl("https://test-payment.momo.vn/v2/gateway/api/create?partnerCode=MOMO&orderId=" + encodedTxn + "&amount=" + finalAmount);
             order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("MOMO:" + qrData, StandardCharsets.UTF_8));
         } else if ("PAYPAL".equalsIgnoreCase(paymentMethod)) {
-            order.setPaymentUrl("https://www.sandbox.paypal.com/checkoutnow?token=" + txnRef + "&client_id=" + paypalClientId);
+            double usdAmount = "ENTERPRISE".equalsIgnoreCase(planType) ? 19.99 : 7.99;
+            String itemName = URLEncoder.encode("Homix " + planType + " VIP Subscription (" + billingCycle + ")", StandardCharsets.UTF_8);
+            order.setPaymentUrl("https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_xclick&business=" + paypalClientId + "&item_name=" + itemName + "&amount=" + String.format(java.util.Locale.US, "%.2f", usdAmount) + "&currency_code=USD&custom=" + encodedTxn + "&return=http%3A%2F%2Flocalhost%3A3000%2Fcheckout%3Fstatus%3Dsuccess");
             order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("PAYPAL_APP:" + paypalAppName + "|CLIENT_ID:" + paypalClientId + "|ORDER:" + txnRef, StandardCharsets.UTF_8));
         } else {
             // CREDIT_CARD or Direct Bank VietQR

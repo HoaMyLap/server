@@ -3,6 +3,7 @@ package com.example.smartmanager.payments;
 import com.example.smartmanager.notifications.NotificationService;
 import com.example.smartmanager.users.UserEntity;
 import com.example.smartmanager.users.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,12 @@ public class PaymentService {
     private final PaymentOrderRepository paymentOrderRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+
+    @Value("${PAYPAL_CLIENT_ID:AULIBK_ava0E1QxLYbRUHI-PkmzzAtCkgKUfBa8O-6MRh2ukhB_Rp4n6Zbl86cXNATk-p6pvC2POzZ7Y}")
+    private String paypalClientId;
+
+    @Value("${PAYPAL_APP_NAME:Homix}")
+    private String paypalAppName;
 
     public PaymentService(
             PaymentOrderRepository paymentOrderRepository,
@@ -77,8 +84,8 @@ public class PaymentService {
             order.setPaymentUrl("https://test-payment.momo.vn/v2/gateway/api/create?partnerCode=MOMO&orderId=" + encodedTxn + "&amount=" + finalAmount);
             order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("MOMO:" + qrData, StandardCharsets.UTF_8));
         } else if ("PAYPAL".equalsIgnoreCase(paymentMethod)) {
-            order.setPaymentUrl("https://www.sandbox.paypal.com/checkoutnow?token=" + txnRef);
-            order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("PAYPAL:" + qrData, StandardCharsets.UTF_8));
+            order.setPaymentUrl("https://www.sandbox.paypal.com/checkoutnow?token=" + txnRef + "&client_id=" + paypalClientId);
+            order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("PAYPAL_APP:" + paypalAppName + "|CLIENT_ID:" + paypalClientId + "|ORDER:" + txnRef, StandardCharsets.UTF_8));
         } else {
             // CREDIT_CARD or Direct Bank VietQR
             order.setPaymentUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("VIETQR:" + qrData, StandardCharsets.UTF_8));

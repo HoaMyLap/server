@@ -197,8 +197,26 @@ public class ProjectService {
         projectRepository.delete(project);
     }
 
+    @Transactional
     public List<WorkspaceMemberDto> getProjectMembers(String projectId) {
-        return projectMemberRepository.findProjectMembersWithDetails(UUID.fromString(projectId));
+        UUID pId = UUID.fromString(projectId);
+        ProjectEntity project = getProjectById(projectId);
+        
+        // Tự động đồng bộ tất cả thành viên trong Workspace (bao gồm Admin và các thành viên) vào dự án này nếu chưa có trong project_members
+        try {
+            List<WorkspaceMemberEntity> wsMembers = workspaceMemberRepository.findByIdWorkspaceId(project.getWorkspaceId());
+            for (WorkspaceMemberEntity wm : wsMembers) {
+                ProjectMemberId pmId = new ProjectMemberId(pId, wm.getId().getUserId());
+                if (!projectMemberRepository.existsById(pmId)) {
+                    String role = "ADMIN".equalsIgnoreCase(wm.getRole()) ? "ADMIN" : (wm.getRole() != null ? wm.getRole() : "MEMBER");
+                    projectMemberRepository.save(new ProjectMemberEntity(pmId, role, LocalDateTime.now()));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to sync workspace members to project: " + e.getMessage());
+        }
+
+        return projectMemberRepository.findProjectMembersWithDetails(pId);
     }
 
     @Transactional

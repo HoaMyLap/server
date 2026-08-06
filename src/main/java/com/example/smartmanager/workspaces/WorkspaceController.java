@@ -171,4 +171,17 @@ public class WorkspaceController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         return ResponseEntity.ok(workspaceService.getAllAccessibleDocuments(workspaceId, userPrincipal.getId()));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@securityService.hasWorkspaceRole(#workspaceId, 'ADMIN')")
+    public ResponseEntity<?> deleteWorkspace(
+            @PathVariable("id") String workspaceId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            workspaceService.deleteWorkspace(workspaceId);
+            return ResponseEntity.ok(Map.of("message", "Xóa không gian làm việc thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

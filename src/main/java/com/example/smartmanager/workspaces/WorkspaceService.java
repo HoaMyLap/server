@@ -398,4 +398,17 @@ public class WorkspaceService {
         documents.sort((d1, d2) -> d2.getUploadedAt().compareTo(d1.getUploadedAt()));
         return documents;
     }
+
+    @Transactional
+    public void deleteWorkspace(String workspaceId) {
+        UUID wsId = UUID.fromString(workspaceId);
+        List<ProjectEntity> projects = projectRepository.findByWorkspaceId(wsId);
+        for (ProjectEntity project : projects) {
+            projectRepository.delete(project);
+        }
+        workspaceMemberRepository.deleteAll(workspaceMemberRepository.findByIdWorkspaceId(wsId));
+        workspaceFileRepository.deleteByWorkspaceId(wsId);
+        workspaceFolderRepository.deleteByWorkspaceId(wsId);
+        workspaceRepository.deleteById(wsId);
+    }
 }

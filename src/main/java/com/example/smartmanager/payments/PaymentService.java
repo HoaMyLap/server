@@ -242,4 +242,26 @@ public class PaymentService {
     public List<PaymentOrderEntity> getUserOrders(String userId) {
         return paymentOrderRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId));
     }
+
+    @Transactional
+    public void cancelSubscription(String userId) {
+        UUID uId = UUID.fromString(userId);
+        UserEntity user = userRepository.findById(uId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thông tin người dùng"));
+
+        user.setSubscriptionPlan("FREE");
+        user.setSubscriptionExpiresAt(null);
+        userRepository.save(user);
+
+        try {
+            notificationService.createNotification(
+                    user.getId().toString(),
+                    "Đã hủy gói dịch vụ thành công",
+                    "Bạn đã hủy gói dịch vụ trả phí thành công. Tài khoản của bạn đã chuyển về Gói Miễn Phí (FREE). Bạn có thể đổi gói bất kỳ lúc nào.",
+                    "SYSTEM"
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to send subscription cancellation notification: " + e.getMessage());
+        }
+    }
 }

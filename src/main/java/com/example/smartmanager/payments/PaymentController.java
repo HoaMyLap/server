@@ -82,6 +82,17 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.getUserOrders(userPrincipal.getId().toString()));
     }
 
+    @PostMapping("/cancel-subscription")
+    public ResponseEntity<?> cancelSubscription(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Vui lòng đăng nhập để thực hiện thao tác này."));
+        }
+        paymentService.cancelSubscription(userPrincipal.getId());
+        return ResponseEntity.ok(Map.of("message", "Đã hủy gói dịch vụ thành công"));
+    }
+
     // =========================================================================
     // GATEWAY CALLBACKS & WEBHOOK IPN ENDPOINTS
     // =========================================================================

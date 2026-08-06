@@ -20,17 +20,22 @@ public class PaymentController {
     }
 
     @PostMapping("/create-order")
-    public ResponseEntity<PaymentOrderEntity> createOrder(
+    public ResponseEntity<?> createOrder(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody Map<String, String> request
     ) {
+        String userId = userPrincipal != null ? userPrincipal.getId().toString() : request.get("userId");
+        if (userId == null || userId.trim().isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Vui lòng đăng nhập để thực hiện thanh toán đơn hàng."));
+        }
+
         String planType = request.getOrDefault("planType", "PRO");
         String billingCycle = request.getOrDefault("billingCycle", "annual");
         String paymentMethod = request.getOrDefault("paymentMethod", "VNPAY");
         String voucherCode = request.get("voucherCode");
 
         PaymentOrderEntity order = paymentService.createOrder(
-                userPrincipal.getId().toString(),
+                userId,
                 planType,
                 billingCycle,
                 paymentMethod,
@@ -68,9 +73,12 @@ public class PaymentController {
     }
 
     @GetMapping("/user-orders")
-    public ResponseEntity<List<PaymentOrderEntity>> getUserOrders(
+    public ResponseEntity<?> getUserOrders(
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
+        if (userPrincipal == null) {
+            return ResponseEntity.ok(List.of());
+        }
         return ResponseEntity.ok(paymentService.getUserOrders(userPrincipal.getId().toString()));
     }
 

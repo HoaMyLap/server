@@ -32,6 +32,12 @@ public class UserEntity {
     @Column(name = "system_role", nullable = false)
     private String systemRole = "USER";
 
+    @Column(name = "subscription_plan", nullable = false)
+    private String subscriptionPlan = "FREE";
+
+    @Column(name = "subscription_expires_at")
+    private LocalDateTime subscriptionExpiresAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

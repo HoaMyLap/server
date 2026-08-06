@@ -7,12 +7,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class PaymentService {
@@ -26,6 +27,18 @@ public class PaymentService {
 
     @Value("${PAYPAL_APP_NAME:Homix}")
     private String paypalAppName;
+
+    @Value("${VNPAY_TMN_CODE:NS4R2SPO}")
+    private String vnpTmnCode;
+
+    @Value("${VNPAY_HASH_SECRET:EPRTWZDPHRVEQOMRWWFZEKQRGYDRCUIO}")
+    private String vnpHashSecret;
+
+    @Value("${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
+    private String vnpPayUrl;
+
+    @Value("${VNPAY_RETURN_URL:http://localhost:3000/checkout?status=success}")
+    private String vnpReturnUrl;
 
     public PaymentService(
             PaymentOrderRepository paymentOrderRepository,
@@ -78,8 +91,9 @@ public class PaymentService {
         String qrData = "HOMIX_PAYMENT_" + txnRef + "_" + finalAmount;
 
         if ("VNPAY".equalsIgnoreCase(paymentMethod)) {
-            order.setPaymentUrl("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=" + (finalAmount * 100) + "&vnp_Command=pay&vnp_CreateDate=20260806120000&vnp_CurrCode=VND&vnp_IpAddr=127.0.0.1&vnp_Locale=vn&vnp_OrderInfo=" + encodedTxn + "&vnp_OrderType=other&vnp_ReturnUrl=http%3A%2F%2Flocalhost%3A3000%2Fcheckout%3Fstatus%3Dsuccess&vnp_TmnCode=HOMIXVN1&vnp_TxnRef=" + encodedTxn + "&vnp_Version=2.1.0&vnp_SecureHash=mock_hash");
-            order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("VNPAY:" + qrData, StandardCharsets.UTF_8));
+            String vnpUrl = buildVnPayUrl(txnRef, finalAmount);
+            order.setPaymentUrl(vnpUrl);
+            order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("VNPAY:" + vnpUrl, StandardCharsets.UTF_8));
         } else if ("MOMO".equalsIgnoreCase(paymentMethod)) {
             order.setPaymentUrl("https://test-payment.momo.vn/v2/gateway/api/create?partnerCode=MOMO&orderId=" + encodedTxn + "&amount=" + finalAmount);
             order.setQrCodeUrl("https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + URLEncoder.encode("MOMO:" + qrData, StandardCharsets.UTF_8));
@@ -95,6 +109,82 @@ public class PaymentService {
         }
 
         return paymentOrderRepository.save(order);
+    }
+
+    private String buildVnPayUrl(String txnRef, long amount) {
+        try {
+            Map<String, String> vnpParams = new HashMap<>();
+            vnpParams.put("vnp_Version", "2.1.0");
+            vnpParams.put("vnp_Command", "pay");
+            vnpParams.put("vnp_TmnCode", vnpTmnCode);
+            vnpParams.put("vnp_Amount", String.valueOf(amount * 100));
+            vnpParams.put("vnp_CurrCode", "VND");
+            vnpParams.put("vnp_TxnRef", txnRef);
+            vnpParams.put("vnp_OrderInfo", "Thanh toan don hang Homix " + txnRef);
+            vnpParams.put("vnp_OrderType", "other");
+            vnpParams.put("vnp_Locale", "vn");
+            vnpParams.put("vnp_ReturnUrl", vnpReturnUrl);
+            vnpParams.put("vnp_IpAddr", "127.0.0.1");
+
+            Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+            String vnpCreateDate = formatter.format(cld.getTime());
+            vnpParams.put("vnp_CreateDate", vnpCreateDate);
+
+            cld.add(Calendar.MINUTE, 15);
+            String vnpExpireDate = formatter.format(cld.getTime());
+            vnpParams.put("vnp_ExpireDate", vnpExpireDate);
+
+            List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
+            Collections.sort(fieldNames);
+
+            StringBuilder hashData = new StringBuilder();
+            StringBuilder query = new StringBuilder();
+
+            Iterator<String> itr = fieldNames.iterator();
+            while (itr.hasNext()) {
+                String fieldName = itr.next();
+                String fieldValue = vnpParams.get(fieldName);
+                if ((fieldValue != null) && (fieldValue.length() > 0)) {
+                    hashData.append(fieldName);
+                    hashData.append('=');
+                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
+                    query.append('=');
+                    query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+
+                    if (itr.hasNext()) {
+                        query.append('&');
+                        hashData.append('&');
+                    }
+                }
+            }
+
+            String queryUrl = query.toString();
+            String vnpSecureHash = hmacSHA512(vnpHashSecret, hashData.toString());
+            queryUrl += "&vnp_SecureHash=" + vnpSecureHash;
+
+            return vnpPayUrl + "?" + queryUrl;
+        } catch (Exception e) {
+            return vnpPayUrl;
+        }
+    }
+
+    private String hmacSHA512(String key, String data) {
+        try {
+            Mac hmac512 = Mac.getInstance("HmacSHA512");
+            SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
+            hmac512.init(secretKey);
+            byte[] result = hmac512.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(2 * result.length);
+            for (byte b : result) {
+                sb.append(String.format("%02x", b & 0xff));
+            }
+            return sb.toString();
+        } catch (Exception ex) {
+            return "";
+        }
     }
 
     @Transactional

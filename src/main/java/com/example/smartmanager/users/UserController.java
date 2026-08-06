@@ -22,7 +22,9 @@ public class UserController {
                         "id", user.getId().toString(),
                         "email", user.getEmail(),
                         "fullname", user.getFullname(),
-                        "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
+                        "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
+                        "subscriptionPlan", user.getSubscriptionPlan() != null ? user.getSubscriptionPlan() : "FREE",
+                        "subscriptionExpiresAt", user.getSubscriptionExpiresAt() != null ? user.getSubscriptionExpiresAt().toString() : ""
                 )))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -49,7 +51,9 @@ public class UserController {
                             "id", saved.getId().toString(),
                             "email", saved.getEmail(),
                             "fullname", saved.getFullname(),
-                            "avatarUrl", saved.getAvatarUrl() != null ? saved.getAvatarUrl() : ""
+                            "avatarUrl", saved.getAvatarUrl() != null ? saved.getAvatarUrl() : "",
+                            "subscriptionPlan", saved.getSubscriptionPlan() != null ? saved.getSubscriptionPlan() : "FREE",
+                            "subscriptionExpiresAt", saved.getSubscriptionExpiresAt() != null ? saved.getSubscriptionExpiresAt().toString() : ""
                     ));
                 })
                 .orElse(ResponseEntity.notFound().build());
